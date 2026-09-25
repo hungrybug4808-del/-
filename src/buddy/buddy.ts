@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { rnd } from '../core/math';
 import { ring, sparkle } from '../fx/effects';
 import { scene } from '../render/stage';
-import { groundY, passable, cellAt, walkY } from '../terrain/grid';
+import { NX, cellAt, cx, cz, groundY, passable, walkY } from '../terrain/grid';
+import { MAP } from '../terrain/generate';
 import { castles, forts } from '../battle/buildings';
 import { plantFlag } from '../battle/flags';
 import { captureBoost, canCapture, veins } from '../battle/veins';
@@ -133,15 +134,18 @@ function candidates(def: BuddyDef): Plan[] {
     if (bldAlive(f)) mk('attack', '砦', f.pos.x, f.pos.z - 2.6, mine);
     else if (bldAlive(castles[1])) mk('attack', '魔王城', 0, TEAM[1].castleZ - 3.6, mine);
   }
-  // 地形：陸の遠距離が2体以上いれば、前線に近い高台の縁へ
+  // 地形：陸の遠距離が2体以上いれば、前線に近い高台（ワールドの高台の目安のまわりで一番高い所）へ
   const shooters = mine.filter(u => u.d.ranged && u.layer === 'land');
   if (shooters.length >= 2) {
     const front = enemies.length ? enemies.reduce((s, e) => s + e.pos.z, 0) / enemies.length : 0;
-    const z0 = Math.max(-12, Math.min(12, front - 4));
-    // 前線に近い順に、手前・奥と交互に探す
-    for (let i = 0; i <= 40; i++) {
-      const z = z0 + (i % 2 ? -1 : 1) * Math.ceil(i / 2) * 0.5, x = 10.75, c = cellAt(x, z);
-      if (passable(c) && walkY[c] >= 3.5) { mk('terrain', '高台', x, z, shooters, walkY[c]); break; }
+    const pts = MAP.def.high.flatMap(p => [p, { x: p.x, z: -p.z }]).sort((a, b) => Math.abs(a.z - (front - 4)) - Math.abs(b.z - (front - 4)));
+    for (const p of pts) {
+      let best = -1, by = 1.9;
+      for (let dz = -3; dz <= 3; dz += 0.5) for (let dx = -3; dx <= 3; dx += 0.5) {
+        const c = cellAt(p.x + dx, p.z + dz);
+        if (passable(c) && walkY[c] > by) { by = walkY[c]; best = c; }
+      }
+      if (best >= 0) { mk('terrain', '高台', cx(best % NX), cz(Math.floor(best / NX)), shooters, by); break; }
     }
   }
   return out;

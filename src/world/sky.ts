@@ -3,6 +3,7 @@ import { hash, rnd } from '../core/math';
 import { Vox, part } from '../core/voxel';
 import { camera, scene } from '../render/stage';
 import { groundY } from '../terrain/grid';
+import { MAP } from '../terrain/generate';
 
 // 空の気候：流れる雲、高山の雪、沼地の雨雲と雨、砂漠の砂嵐
 
@@ -74,27 +75,38 @@ const falls: Fall[] = [];
 
 const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
 
+const FALL_LOOK = {
+  snow: { size: [0.09, 0.09, 0.09] as [number, number, number], color: 0xffffff, top: 10, vy: 1.1, drift: 0, sway: 0.35, opacity: 0.95 },
+  rain: { size: [0.03, 0.45, 0.03] as [number, number, number], color: 0xb8d4ec, top: 10, vy: 11, drift: 0, sway: 0, opacity: 0.7 },
+  sand: { size: [0.07, 0.07, 0.07] as [number, number, number], color: 0xd9bf85, top: 2.2, vy: 0.25, drift: 2.4, sway: 0.3, opacity: 0.85 },
+};
+let rainClouds: THREE.Group[] = [];
+
 export function buildSky(): void {
-  for (let i = 0; i < 12; i++) {
-    const g = part('cloud' + (i % 5), cloudVox(i % 5, false), 0, 0, 0, 0.9, cloudMat);
-    g.position.set(rnd(-CLOUD_X, CLOUD_X), rnd(20, 24), rnd(-CLOUD_Z, CLOUD_Z));
-    g.rotation.y = Math.floor(Math.random() * 4) * Math.PI / 2;
-    scene.add(g);
-    clouds.push({ g, speed: rnd(0.5, 0.9) });
-  }
-  // 沼地の上に居座る雨雲
+  if (!clouds.length)
+    for (let i = 0; i < 12; i++) {
+      const g = part('cloud' + (i % 5), cloudVox(i % 5, false), 0, 0, 0, 0.9, cloudMat);
+      g.position.set(rnd(-CLOUD_X, CLOUD_X), rnd(20, 24), rnd(-CLOUD_Z, CLOUD_Z));
+      g.rotation.y = Math.floor(Math.random() * 4) * Math.PI / 2;
+      scene.add(g);
+      clouds.push({ g, speed: rnd(0.5, 0.9) });
+    }
+  // ワールドの気候：雨雲と、降るもの（雪・雨・砂）
+  for (const g of rainClouds) scene.remove(g);
+  rainClouds = [];
+  for (const f of falls) { scene.remove(f.mesh); f.mesh.geometry.dispose(); (f.mesh.material as THREE.Material).dispose(); }
+  falls.length = 0;
   const rainCloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
-  [[-13, -3], [-11, 3.5], [-14.5, 2], [-10, -2.5]].forEach(([x, z], i) => {
-    const g = part('rainCloud' + i, cloudVox(20 + i, true), 0, 0, 0, 0.9, rainCloudMat);
+  (MAP.def.rainClouds ?? []).forEach(([x, z], i) => {
+    const g = part('rainCloud' + (i % 4), cloudVox(20 + (i % 4), true), 0, 0, 0, 0.9, rainCloudMat);
     g.position.set(x, 11, z);
     scene.add(g);
+    rainClouds.push(g);
   });
-  // 高山の雪
-  falls.push(makeFall(420, { x0: 17, x1: 24, z0: -35, z1: 35, mirror: false }, [0.09, 0.09, 0.09], 0xffffff, 10, 1.1, 0, 0.35, 0.95));
-  // 沼地の雨
-  falls.push(makeFall(260, { x0: -17, x1: -8, z0: -5.5, z1: 5.5, mirror: false }, [0.03, 0.45, 0.03], 0xb8d4ec, 10, 11, 0, 0, 0.7));
-  // 砂漠の砂嵐（低く横に流れる）
-  falls.push(makeFall(220, { x0: -17, x1: -8, z0: 12, z1: 25, mirror: true }, [0.07, 0.07, 0.07], 0xd9bf85, 2.2, 0.25, 2.4, 0.3, 0.85));
+  for (const w of MAP.def.weather) {
+    const L = FALL_LOOK[w.kind];
+    falls.push(makeFall(w.count, { x0: w.x0, x1: w.x1, z0: w.z0, z1: w.z1, mirror: w.mirror }, L.size, L.color, L.top, L.vy, L.drift, L.sway, L.opacity));
+  }
 }
 
 export function updateSky(dt: number, t: number): void {

@@ -51,7 +51,7 @@ for (let x = -4; x <= 3; x++)
     if (r > 2.6 && r < 4.2) veinV.set(x, -1, z, hash(x, 9, z) > 0.5 ? 0x6e737c : 0x8a8f99);
   }
 
-export const veins: Vein[] = MAP.veins.map(({ x, z, layer }) => {
+function makeVein({ x, z, layer }: { x: number; z: number; layer: Layer }): Vein {
   // 海の竜脈は水面から、空の竜脈は浮島の上から生える
   const y = layer === 'sea' ? 0 : layer === 'air' ? surfaceY(x, z) : groundY(x, z);
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -75,7 +75,15 @@ export const veins: Vein[] = MAP.veins.map(({ x, z, layer }) => {
   bar.position.set(x, y + 1.3, z);
   scene.add(bar);
   return { layer, name: VEIN_NAME[layer], pos: new THREE.Vector3(x, y, z), g, mat, rm, bar, fill, meter: 0, owner: -1 as const };
-});
+}
+
+/** 今のワールドの竜脈（ワールドを変えたら rebuildVeins で置き直す） */
+export const veins: Vein[] = MAP.veins.map(makeVein);
+export function rebuildVeins(): void {
+  for (const v of veins) { scene.remove(v.g, v.rm, v.bar); v.mat.dispose(); v.rm.geometry.dispose(); v.rm.material.dispose(); v.fill.material.dispose(); }
+  veins.length = 0;
+  veins.push(...MAP.veins.map(makeVein));
+}
 
 export function ownedVeins(team: Team): number {
   return veins.filter(v => v.owner === team).length;

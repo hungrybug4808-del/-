@@ -8,11 +8,14 @@ import { onRestart, updateHud } from './ui/hud';
 import { updateCamera } from './input/controls';
 import { resetBuddy, updateBuddy } from './buddy/buddy';
 import { showSelect, updateBuddyUI } from './ui/buddyUI';
+import { showWorlds } from './ui/worldUI';
 
 buildTerrain();
 buildSky();
-// 「もう一度」でバディを選び直す
-onRestart(() => { restartBattle(); resetBuddy(); showSelect(); });
+// 試合の前に、ワールド → バディの順に選ぶ（「もう一度」でも選び直す）
+const pick = (): void => showWorlds(showSelect);
+pick();
+onRestart(() => { restartBattle(); resetBuddy(); pick(); });
 
 let last = performance.now(), time = 0;
 function frame(now: number): void {

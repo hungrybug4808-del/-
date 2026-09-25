@@ -1,6 +1,6 @@
 import { hash } from '../core/math';
 import { Bio } from './biomes';
-import { MAP, RAMP, RIDGE } from './generate';
+import { MAP } from './generate';
 import { CELL, NX, NZ, biome, colOf, cx, cz, level, walkY, waterDepth } from './grid';
 import { DS, Decor } from './mesh';
 
@@ -64,17 +64,13 @@ function tuft(d: Decor, x: number, y: number, z: number, c: number, h = 1): void
   d.box(x, y, z, 1, h, 1, c);
 }
 
-/** 飾りを置かない場所（道・城と砦のまわり・竜脈） */
+/** 飾りを置かない場所（城と砦のまわり・陸の竜脈・ワールドごとの道など） */
 function reserved(x: number, z: number): boolean {
   const zz = Math.abs(z);
-  if (Math.abs(x) <= 1.8 && x > -8 && x < 5) return true;
   if (zz >= 25 && Math.abs(x) <= 8) return true;
   if (Math.hypot(x, zz - MAP.fortZ) < 3) return true;
-  if (Math.hypot(x - MAP.hill.x, z - MAP.hill.z) < 2.4) return true;
-  // 坂と峠は道なので空けておく
-  if (x >= RAMP.x0 - 0.5 && x < RAMP.x1 && zz >= RAMP.z0 - 0.5 && zz < RAMP.z1 + 0.5) return true;
-  if (x >= RIDGE.x0 - 1 && x < RIDGE.x1 + 1 && zz >= RIDGE.pass[0] - 0.5 && zz < RIDGE.pass[1] + 0.5) return true;
-  return false;
+  for (const v of MAP.veins) if (v.layer === 'land' && Math.hypot(x - v.x, z - v.z) < 2.4) return true;
+  return MAP.def.reserved?.(x, zz) ?? false;
 }
 
 export function buildDecor(): Decor {

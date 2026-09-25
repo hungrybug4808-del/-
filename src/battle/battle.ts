@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { rnd } from '../core/math';
 import { DEF, HAND } from '../units/registry';
+import { MAP } from '../terrain/generate';
 import type { Team, UnitType } from '../units/types';
 import { forts, resetBuildings, updateBuildings } from './buildings';
 import { clearArrows, fireArrowFrom, updateArrows } from './projectiles';
@@ -45,8 +46,9 @@ function updateForts(dt: number): void {
   }
 }
 
-/** CPU が海のモンスターを出す水面（自陣の、海につながる水） */
+/** CPU が海のモンスターを出す水面（自陣の、海につながる水）。ワールドが変わったら作り直す */
 let cpuSea: [number, number][] | null = null;
+export function resetCpuSpots(): void { cpuSea = null; }
 function cpuSeaSpots(): [number, number][] {
   if (!cpuSea) {
     cpuSea = [];
@@ -73,12 +75,11 @@ function cpuThink(dt: number): void {
   if (cpu.mana >= cost && Math.random() < 0.6) {
     const n = cost === 1 ? Math.min(2, Math.floor(cpu.mana)) : 1;
     for (let tries = 0; tries < 30; tries++) {
-      // 陸は3本の道のどれか（中央・南・北）の自陣側、空は中央、海は自陣の海
-      const lane = Math.random();
-      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots())
-        : d.layer === 'air' || lane < 0.5 ? [rnd(-6, 6), rnd(12, 27)]
-        : lane < 0.8 ? [rnd(-15, -11.5), rnd(17, 24)]
-        : [rnd(11, 16), rnd(17.5, 22.5)];
+      // 陸はワールドの3本の道のどれかの自陣側、空は最初の場所、海は自陣の海
+      const spots = MAP.def.cpuSpawns;
+      let r = Math.random() * spots.reduce((a, s) => a + s[4], 0), sp = spots[0];
+      if (d.layer === 'land') for (const s of spots) { r -= s[4]; if (r <= 0) { sp = s; break; } }
+      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots()) : [rnd(sp[0], sp[1]), rnd(sp[2], sp[3])];
       if (!canSpawnAt(cpu.next, 1, x, z)) continue;
       for (let i = 0; i < n; i++) {
         const sx = x + (i - 1) * 0.8, sz = z + rnd(-0.3, 0.3), ok = canSpawnAt(cpu.next, 1, sx, sz);

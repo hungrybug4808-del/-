@@ -18,6 +18,7 @@ export const TOP_COLOR: Record<number, number[]> = {
   [B.DRY]: [0xb98a5a, 0xa57649, 0xc59a68],
   [B.MUD]: [0x5d5236, 0x6a5e3e],
   [B.GRAVEL]: [0x9a958c, 0x857f76],
+  [B.ICE]: [0xcfe8f4, 0xbcdcee, 0xe2f2fa],
 };
 export const SIDE_COLOR: Record<number, number[]> = {
   ...TOP_COLOR,

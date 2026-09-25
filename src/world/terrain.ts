@@ -58,29 +58,35 @@ function makeWhirl(x: number, z: number): Whirl {
   return { g, x, z };
 }
 
-export function buildTerrain(): void {
+/** いま置いている地形のメッシュ（ワールドを変えたら捨てる） */
+const built: THREE.Mesh[] = [];
+function keep(m: THREE.Mesh): THREE.Mesh { built.push(m); scene.add(m); return m; }
 
+/** 今のワールドの地形・水・飾りを置く（前のワールドのものは捨てる） */
+export function buildTerrain(): void {
+  for (const m of built) { scene.remove(m); m.geometry.dispose(); }
+  built.length = 0;
+  pickables.length = 0;
+  for (const w of whirls) scene.remove(w.g);
+  whirls.length = 0;
   for (let z0 = 0; z0 < NZ; z0 += CHUNK)
     for (let x0 = 0; x0 < NX; x0 += CHUNK) {
       const { land, water } = buildChunk(x0, z0);
       if (land) {
-        const m = new THREE.Mesh(land, landMat);
+        const m = keep(new THREE.Mesh(land, landMat));
         m.castShadow = m.receiveShadow = true;
-        scene.add(m);
         pickables.push(m);
       }
       if (water) {
-        const m = new THREE.Mesh(water, waterMat);
+        const m = keep(new THREE.Mesh(water, waterMat));
         m.receiveShadow = true;
         m.renderOrder = 1;
-        scene.add(m);
         pickables.push(m);
       }
     }
   for (const geo of buildDecor().build()) {
-    const m = new THREE.Mesh(geo, decorMat);
+    const m = keep(new THREE.Mesh(geo, decorMat));
     m.castShadow = m.receiveShadow = true;
-    scene.add(m);
   }
   // マップの外に広がる海
   const W = 400;
@@ -90,9 +96,8 @@ export function buildTerrain(): void {
     geo.translate((x0 + x1) / 2, -0.08, (z0 + z1) / 2);
     const p = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 2, p.getZ(i) / 2);
-    const m = new THREE.Mesh(geo, seaMat);
+    const m = keep(new THREE.Mesh(geo, seaMat));
     m.receiveShadow = true;
-    scene.add(m);
   }
   for (const w of MAP.whirlpools) whirls.push(makeWhirl(w.x, w.z));
 }

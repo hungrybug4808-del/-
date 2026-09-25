@@ -118,6 +118,8 @@ function shielded(u: Unit, b: Building): boolean {
 const fields = new Map<string, FlowField>();
 const bldIds = new Map<Building, number>();
 bldEvents.changed = () => fields.clear();
+/** ワールドが変わったら、経路の地図を作り直す */
+export function resetNav(): void { fields.clear(); }
 function fieldFor(b: Building, lay: NavLayer, lane: Lane = -1): FlowField {
   if (!bldIds.has(b)) bldIds.set(b, bldIds.size);
   const key = bldIds.get(b) + ':' + lay + ':' + lane;

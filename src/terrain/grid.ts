@@ -11,7 +11,7 @@ export const XMIN = X0, XMAX = X0 + NX * CELL, ZMIN = Z0, ZMAX = Z0 + NZ * CELL;
 
 /** ブロックの種類 */
 export const enum B {
-  AIR = 0, GRASS, MEADOW, DIRT, PATH, STONE, SNOW, SAND, DRY, MUD, GRAVEL, WATER,
+  AIR = 0, GRASS, MEADOW, DIRT, PATH, STONE, SNOW, SAND, DRY, MUD, GRAVEL, ICE, WATER,
 }
 
 export const blocks = new Uint8Array(NX * NY * NZ);
