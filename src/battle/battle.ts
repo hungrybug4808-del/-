@@ -6,7 +6,7 @@ import { forts, resetBuildings, updateBuildings } from './buildings';
 import { clearArrows, fireArrowFrom, updateArrows } from './projectiles';
 import { clearUnits, spawnUnit, updateUnits } from './units';
 import { VEIN_BONUS, drawVeins, ownedVeins, resetVeins, updateVeins } from './veins';
-import { XMAX, XMIN, ZMAX, ZMIN, cellAt, passable, walkY } from '../terrain/grid';
+import { SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, blocked, cellAt, passable, seaLevel, walkY } from '../terrain/grid';
 import { alive, bldAlive, game, hdist, inOwnHalf, units } from './world';
 
 // 1試合の進行：魔素・砦・竜脈・CPU・勝敗
@@ -72,20 +72,27 @@ function cpuThink(dt: number): void {
   }
 }
 
-/** 出せる場所か：自陣で、陸のモンスターなら立てる地面（深い水・崖の上の尾根などは不可） */
-export function canSpawnAt(type: UnitType, team: Team, x: number, z: number, hitY?: number): boolean {
-  if (!inOwnHalf(team, z) || x < XMIN + 0.5 || x > XMAX - 0.5 || z < ZMIN + 0.5 || z > ZMAX - 0.5) return false;
-  if (DEF[type].layer === 'air') return true;
-  const c = cellAt(x, z);
-  if (!passable(c)) return false;
-  return hitY === undefined || Math.abs(hitY - walkY[c]) < 1.2;
+export type SpawnResult = 'ok' | 'mana' | 'half' | 'land' | 'sea';
+
+/**
+ * 出せる場所か。自陣であること。陸は立てる地面（深い水・尾根・浮島は不可）、
+ * 海は海につながる水面（湖や高台の川は不可）、空はどこでも。
+ */
+function spawnCheck(type: UnitType, team: Team, x: number, z: number, hitY?: number): SpawnResult {
+  if (!inOwnHalf(team, z) || x < XMIN + 0.5 || x > XMAX - 0.5 || z < ZMIN + 0.5 || z > ZMAX - 0.5) return 'half';
+  const layer = DEF[type].layer, c = cellAt(x, z);
+  if (layer === 'air') return 'ok';
+  if (layer === 'sea') return seaLevel[c] === SEA_LEVEL && !blocked[c] && (hitY === undefined || Math.abs(hitY) < 0.6) ? 'ok' : 'sea';
+  return passable(c) && (hitY === undefined || Math.abs(hitY - walkY[c]) < 1.2) ? 'ok' : 'land';
+}
+export function canSpawnAt(type: UnitType, team: Team, x: number, z: number): boolean {
+  return spawnCheck(type, team, x, z) === 'ok';
 }
 
-export type SpawnResult = 'ok' | 'mana' | 'place';
 /** プレイヤーの出撃 */
 export function playerSpawn(type: UnitType, x: number, z: number, hitY: number): SpawnResult {
-  const d = DEF[type];
-  if (!canSpawnAt(type, 0, x, z, hitY)) return 'place';
+  const d = DEF[type], where = spawnCheck(type, 0, x, z, hitY);
+  if (where !== 'ok') return where;
   if (player.mana < d.cost) return 'mana';
   player.mana -= d.cost;
   spawnUnit(type, 0, x, z);

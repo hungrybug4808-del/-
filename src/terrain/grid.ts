@@ -54,6 +54,8 @@ export const walkY = new Float32Array(NC);
 export const topY = new Float32Array(NC);
 /** 立つ面の上の水の深さ（ブロック数） */
 export const waterDepth = new Uint8Array(NC);
+/** 海のモンスターが泳ぐ水面の段（ブロック数）。-1 は泳げない */
+export const seaLevel = new Int16Array(NC);
 /** 建物などで塞がれている */
 export const blocked = new Uint8Array(NC);
 /** 地形の種類（Biome） */
@@ -82,14 +84,35 @@ export function computeColumns(): void {
         if (ok) { lv = iy + 1; depth = w; break; }
       }
       waterDepth[c] = depth;
+      // 下から見て最初の水面（上に空きがあるもの）。浮島の下の川も泳げる
+      let sl = -1;
+      for (let iy = 0; iy < NY - 1 && sl < 0; iy++) {
+        if (getB(ix, iy, iz) !== B.WATER || getB(ix, iy + 1, iz) !== B.AIR) continue;
+        let ok = true;
+        for (let k = 1; k <= HEADROOM; k++) if (getB(ix, iy + k, iz) !== B.AIR) { ok = false; break; }
+        if (ok) sl = iy + 1;
+      }
+      seaLevel[c] = sl;
       // 深さ2以上の水には入れない
       level[c] = lv >= 0 && depth <= 1 ? lv : -1;
       walkY[c] = lv >= 0 ? yTop(lv - 1) : topY[c];
     }
 }
 
-export function passable(c: number): boolean {
-  return c >= 0 && level[c] >= 0 && !blocked[c];
+/** 動ける場所。0 = 陸、1 = 海 */
+export type NavLayer = 0 | 1;
+export const levels: [Int16Array, Int16Array] = [level, seaLevel];
+
+export function passable(c: number, lay: NavLayer = 0): boolean {
+  return c >= 0 && levels[lay][c] >= 0 && !blocked[c];
+}
+
+/** 海面（川・海がつながる高さ）。湖や高台の川は海のモンスターには別の水域 */
+export const SEA_LEVEL = iyOf(0) + 1;
+/** 海のモンスターが泳ぐ水面の高さ */
+export function seaY(x: number, z: number): number {
+  const c = cellAt(x, z);
+  return c >= 0 && seaLevel[c] >= 0 ? yTop(seaLevel[c] - 1) : 0;
 }
 
 /** 陸のモンスターが立つ（または演出を置く）地面の高さ */

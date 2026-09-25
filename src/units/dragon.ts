@@ -383,12 +383,12 @@ export const dragon: UnitDef<DragonRig> = {
     breatheFx(u);
     if (tgt.isBld) hurtBld(tgt, CASTLE_DPS * dt);
     else {
-      // ブレスは範囲攻撃。狙った相手と同じ場所（空か地上）の敵を焼く
+      // ブレスは範囲攻撃。狙った相手と同じ場所（陸・海・空）の敵を焼く
       const p = aimPoint(tgt, u.pos);
       for (const e of units)
-        if (e.team !== u.team && alive(e) && e.air === tgt.air && Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < 1.9 + e.radius * 0.5)
+        if (e.team !== u.team && alive(e) && e.layer === tgt.layer && Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < 1.9 + e.radius * 0.5)
           hurt(e, DPS * dt);
-      if (!tgt.air && Math.random() < 0.5)
+      if (tgt.layer === 'land' && Math.random() < 0.5)
         solid.spawn(vec(p.x + rnd(-0.4, 0.4), tgt.pos.y + 0.2, p.z + rnd(-0.4, 0.4)), vec(0, rnd(0.6, 1.2), 0), rnd(1, 1.5), rnd(0.15, 0.25), 0x5e5750, -0.3, 0.8, { gr: 1.5 });
     }
     addShake(0.03);

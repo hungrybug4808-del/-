@@ -4,7 +4,7 @@ import {
   B, CELL, NX, NY, NZ, biome, colOf, computeColumns, cx, cz, iyOf, setB,
 } from './grid';
 
-// 最初のマップ。z=0 を境に左右対称で、両端（z=±32）に魔王城。
+// 最初のマップ。z=0 を境に左右対称で、両端（z=±30）に魔王城。背中側（|z|>33）は海。
 // x の南（−）から北（＋）へ：
 //   海の通り道 → 南の低地（海岸・砂浜・砂漠・荒野・沼地）→ 中央の平らな道（平原・草原・中央の丘）
 //   → 丘陵と森林 → 絶壁の上の高台（谷・渡河点・洞窟）→ 山岳と高山（湖・滝）
@@ -44,9 +44,17 @@ const riverZ = (x: number) => 6.2 * smooth(-9, -6, x) * (1 - smooth(3, 6, x));
 const RIVER_W = 1.2;
 
 export const MAP = {
-  castleZ: 32,
+  castleZ: 30,
   fortZ: 20,
   hill: { x: 0, z: 0, top: 1.5 },
+  /** 空の竜脈を載せる浮島（崖より高い） */
+  sky: { x: 7, z: 0, top: 8.5, r: 2.6 },
+  /** 竜脈：陸（中央の丘）・海（海の通り道の真ん中）・空（浮島） */
+  veins: [
+    { x: 0, z: 0, layer: 'land' },
+    { x: -20.5, z: 0, layer: 'sea' },
+    { x: 7, z: 0, layer: 'air' },
+  ] as { x: number; z: number; layer: 'land' | 'sea' | 'air' }[],
   waterfalls: [] as { x: number; z: number; top: number; bottom: number }[],
   whirlpools: [{ x: -20.5, z: 5.5 }, { x: -20.5, z: -5.5 }],
 };
@@ -55,7 +63,7 @@ function column(x: number, zz: number): Col {
   const sx = shoreX(zz);
 
   // 魔王城の背中側の海
-  if (zz > 35.25) return { h: q(Math.max(-3, -0.5 - (zz - 35.25) * 1.2)), mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.SEA };
+  if (zz > 33) return { h: q(Math.max(-3, -1.0 - (zz - 33) * 1.2)), mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.SEA };
 
   // 南の海の通り道（島と渦潮）
   if (x < sx) {
@@ -76,7 +84,7 @@ function column(x: number, zz: number): Col {
   }
 
   // 魔王城の前庭
-  if (zz >= 27.5 && Math.abs(x) <= 7.5) return { h: 0, mat: Math.abs(x) <= 1.5 ? B.PATH : B.GRASS, sub: B.DIRT, bio: Bio.PLAIN };
+  if (zz >= 25.5 && Math.abs(x) <= 7.5) return { h: 0, mat: Math.abs(x) <= 1.5 ? B.PATH : B.GRASS, sub: B.DIRT, bio: Bio.PLAIN };
 
   // 南の低地
   if (x < -8) {
@@ -163,6 +171,16 @@ export function generateMap(): void {
         for (let iy = f + 1; iy <= iyOf(c.cave[1]); iy++) setB(ix, iy, iz, B.AIR);
       }
       if (c.falls) for (let iy = iyOf(c.falls[0]) + 1; iy <= iyOf(c.falls[1]); iy++) setB(ix, iy, iz, B.WATER);
+    }
+  // 浮島：上は草地、下は岩の円錐
+  const I = MAP.sky;
+  for (let iz = 0; iz < NZ; iz++)
+    for (let ix = 0; ix < NX; ix++) {
+      const x = cx(ix), z = cz(iz), d = Math.hypot(x - I.x, z - I.z);
+      if (d >= I.r) continue;
+      const bottom = q(I.top - 1 - 3.2 * (1 - d / I.r) - 0.6 * hash(ix, 7, Math.abs(iz - NZ / 2 + 0.5) | 0));
+      const top = iyOf(d > I.r - 0.6 ? I.top - 0.5 : I.top);
+      for (let iy = iyOf(bottom); iy <= top; iy++) setB(ix, iy, iz, iy === top ? B.GRASS : top - iy <= 1 ? B.DIRT : B.STONE);
     }
   computeColumns();
   MAP.waterfalls = [

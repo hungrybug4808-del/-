@@ -7,11 +7,20 @@ import { RAW_KEYS, type Building, type Team, type Unit, type UnitType } from '..
 import { BAR_BG, BAR_GEO } from './bars';
 import { bldEvents } from './buildings';
 import { veinFor } from './veins';
-import { NX, XMAX, XMIN, ZMAX, ZMIN, cellAt, groundY, passable, surfaceY } from '../terrain/grid';
+import { Bio } from '../terrain/biomes';
+import {
+  NX, NZ, XMAX, XMIN, ZMAX, ZMIN, biome, cellAt, cx, cz, groundY, passable, seaY, surfaceY, type NavLayer,
+} from '../terrain/grid';
 import { FlowField, canStep, findPath, walkable } from '../terrain/nav';
 import {
   TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, canHit, game, hdist, inRange, setState, units, validTarget,
 } from './world';
+
+/** 場所ごとの高さ：陸は地面、海は水面、空は下の地形（その上を飛ぶ） */
+function heightFor(layer: Unit['layer'], x: number, z: number): number {
+  return layer === 'air' ? surfaceY(x, z) : layer === 'sea' ? seaY(x, z) : groundY(x, z);
+}
+const navOf = (u: Unit): NavLayer => (u.layer === 'sea' ? 1 : 0);
 
 export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Unit {
   const d = DEF[type];
@@ -19,13 +28,13 @@ export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Uni
   const rig = d.make(mat);
   scene.add(rig.root);
   const yaw = team === 0 ? 0 : Math.PI;
-  const air = d.layer === 'air';
+  const layer = d.layer, air = layer === 'air';
   // 足元の陣営リング
   const ringM = new THREE.Mesh(new THREE.RingGeometry(d.ringR * 0.8, d.ringR, 32), new THREE.MeshBasicMaterial({
     color: TEAM[team].color, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide,
   }));
   ringM.rotation.x = -Math.PI / 2;
-  const y = air ? surfaceY(x, z) : groundY(x, z);
+  const y = heightFor(layer, x, z);
   ringM.position.set(x, y + 0.03, z);
   scene.add(ringM);
   // 頭上のHPバー
@@ -42,7 +51,7 @@ export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Uni
   const u: Unit = {
     isBld: false, type, team, d, rig, mat, hp: d.hp, pos: new THREE.Vector3(x, y, z), yaw, yawS: yaw,
     state: 'spawn', st: 0, life: 0, atk: null, target: null, P: d.base(), fired: {},
-    walk: Math.random() * 6, flash: 0, fp: Math.random() * 6, tp: 0, air, radius: d.radius,
+    walk: Math.random() * 6, flash: 0, fp: Math.random() * 6, tp: 0, layer, air, radius: d.radius,
     retarget: 0, aimPitch: 0, inhale: 0, ringM, bar, fill, path: [], pathT: 0, pathGoal: null,
   };
   units.push(u);
@@ -76,8 +85,11 @@ function chooseTarget(u: Unit): void {
   }
   if (best) { u.target = best; return; }
   let bb: Building | null = null, bbd = 1e9;
+  const c = cellAt(u.pos.x, u.pos.z);
   for (const b of blds) {
     if (b.team === u.team || !bldAlive(b)) continue;
+    // 陸・海のモンスターは、たどり着けない建物（海から届かない砦など）は狙わない
+    if (!u.air && fieldFor(b, navOf(u)).dist[c] === Infinity && bldDist(u, b) > u.d.range) continue;
     const d = bldDist(u, b);
     if (d < bbd) { bbd = d; bb = b; }
   }
@@ -86,33 +98,34 @@ function chooseTarget(u: Unit): void {
 
 // ---- 移動 ----
 
-/** 建物へ向かう距離の地図（建物ごとに1つ。建物が崩れたら作り直す） */
-const fields = new Map<Building, FlowField>();
-bldEvents.changed = () => fields.clear();
-function fieldFor(b: Building): FlowField {
-  let f = fields.get(b);
+/** 建物へ向かう距離の地図（建物ごと・陸と海ごとに1つ。建物が崩れたら作り直す） */
+const fields: [Map<Building, FlowField>, Map<Building, FlowField>] = [new Map(), new Map()];
+bldEvents.changed = () => { fields[0].clear(); fields[1].clear(); };
+function fieldFor(b: Building, lay: NavLayer): FlowField {
+  let f = fields[lay].get(b);
   if (!f) {
-    // 敷地のすぐ外のマスがゴール
-    const goals: number[] = [];
-    const inside = new Set(b.cells);
-    for (const c of b.cells)
-      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const n = c + dx + dz * NX;
-        if (!inside.has(n) && passable(n)) goals.push(n);
+    // 敷地のすぐ外がゴール。海は、建物に一番近い水面の並び
+    const near: [number, number][] = [];
+    for (let iz = 0; iz < NZ; iz++)
+      for (let ix = 0; ix < NX; ix++) {
+        const c = ix + iz * NX, x = cx(ix), z = cz(iz), p = bldPoint(b, x, z), d = Math.hypot(x - p.x, z - p.z);
+        if (d <= 1.6 && passable(c, lay)) near.push([c, d]);
       }
-    fields.set(b, (f = new FlowField(goals)));
+    const reach = lay === 0 ? 0.8 : Math.min(...near.map(n => n[1])) + 0.35;
+    const goals = near.filter(n => n[1] <= reach).map(n => n[0]);
+    fields[lay].set(b, (f = new FlowField(goals, lay)));
   }
   return f;
 }
 
-/** 陸：地形で通れない方向へは進まず、壁に沿って滑る */
+/** 陸・海：地形で通れない方向へは進まず、壁に沿って滑る */
 function tryMove(u: Unit, nx: number, nz: number): void {
-  const c0 = cellAt(u.pos.x, u.pos.z);
+  const c0 = cellAt(u.pos.x, u.pos.z), lay = navOf(u);
   const ok = (x: number, z: number) => {
     const c = cellAt(x, z);
     if (c < 0) return false;
     if (c === c0) return true;
-    return passable(c0) ? canStep(c0, c) : passable(c);
+    return passable(c0, lay) ? canStep(c0, c, lay) : passable(c, lay);
   };
   if (ok(nx, nz)) { u.pos.x = nx; u.pos.z = nz; }
   else if (ok(nx, u.pos.z)) u.pos.x = nx;
@@ -125,6 +138,7 @@ function tryMove(u: Unit, nx: number, nz: number): void {
  */
 function moveToward(u: Unit, tx: number, tz: number, dt: number, field?: FlowField): void {
   let wx = tx, wz = tz;
+  const lay = navOf(u);
   if (!u.air) {
     u.pathT -= dt;
     const c = cellAt(u.pos.x, u.pos.z);
@@ -140,7 +154,7 @@ function moveToward(u: Unit, tx: number, tz: number, dt: number, field?: FlowFie
     } else {
       const moved = !u.pathGoal || Math.hypot(u.pathGoal.x - tx, u.pathGoal.z - tz) > 1.5;
       if (u.pathT <= 0 || moved) {
-        u.path = walkable(c, u.pos.x, u.pos.z, tx, tz) ? [] : findPath(u.pos.x, u.pos.z, tx, tz) ?? [];
+        u.path = walkable(c, u.pos.x, u.pos.z, tx, tz, lay) ? [] : findPath(u.pos.x, u.pos.z, tx, tz, lay) ?? [];
         u.pathGoal = { x: tx, z: tz };
         u.pathT = 0.8;
       }
@@ -150,20 +164,28 @@ function moveToward(u: Unit, tx: number, tz: number, dt: number, field?: FlowFie
   }
   const dx = wx - u.pos.x, dz = wz - u.pos.z, L = Math.hypot(dx, dz);
   if (L < 1e-4) return;
-  const step = Math.min(L, u.d.speed * dt);
+  const step = Math.min(L, u.d.speed * speedMul(u) * dt);
   if (u.air) { u.pos.x += (dx / L) * step; u.pos.z += (dz / L) * step; }
   else tryMove(u, u.pos.x + (dx / L) * step, u.pos.z + (dz / L) * step);
   u.yaw = Math.atan2(dx, dz);
 }
 
-/** 高さ：陸は足元の地面へ、空は下と少し先の地形より上を保つ */
+/** 沼地と砂漠では陸の移動が遅くなる */
+export const SLOW_BIOME_MUL = 0.7;
+function speedMul(u: Unit): number {
+  if (u.layer !== 'land') return 1;
+  const b = biome[cellAt(u.pos.x, u.pos.z)];
+  return b === Bio.SWAMP || b === Bio.DESERT ? SLOW_BIOME_MUL : 1;
+}
+
+/** 高さ：陸は足元の地面、海は水面、空は下と少し先の地形より上を保つ */
 function followHeight(u: Unit, dt: number): void {
   if (u.air) {
     const fx = Math.sin(u.yaw) * 1.5, fz = Math.cos(u.yaw) * 1.5;
     const base = Math.max(surfaceY(u.pos.x, u.pos.z), surfaceY(u.pos.x + fx, u.pos.z + fz), surfaceY(u.pos.x + fx * 2, u.pos.z + fz * 2));
     u.pos.y += (base - u.pos.y) * Math.min(1, dt * (base > u.pos.y ? 4 : 1.5));
   } else {
-    u.pos.y += (groundY(u.pos.x, u.pos.z) - u.pos.y) * Math.min(1, dt * 12);
+    u.pos.y += (heightFor(u.layer, u.pos.x, u.pos.z) - u.pos.y) * Math.min(1, dt * 12);
   }
 }
 
@@ -215,18 +237,18 @@ function unitLogic(u: Unit, dt: number): void {
   if (u.state !== 'move') setState(u, 'move');
   if (t.isBld) {
     const p = bldPoint(t, u.pos.x, u.pos.z);
-    moveToward(u, p.x, p.z, dt, u.air ? undefined : fieldFor(t));
+    moveToward(u, p.x, p.z, dt, u.air ? undefined : fieldFor(t, navOf(u)));
   } else moveToward(u, t.pos.x, t.pos.z, dt);
 }
 
-/** 同じ場所（陸どうし・空どうし）のモンスターが重ならないように押し合う */
+/** 同じ場所（陸どうし・海どうし・空どうし）のモンスターが重ならないように押し合う */
 function separate(): void {
   for (let i = 0; i < units.length; i++) {
     const a = units[i];
     if (!alive(a)) continue;
     for (let j = i + 1; j < units.length; j++) {
       const b = units[j];
-      if (!alive(b) || a.air !== b.air) continue;
+      if (!alive(b) || a.layer !== b.layer) continue;
       const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, dd = Math.hypot(dx, dz), min = (a.radius + b.radius) * 0.85;
       if (dd < min && dd > 1e-4) {
         const push = (min - dd) * 0.25, nx = dx / dd, nz = dz / dd;

@@ -68,7 +68,7 @@ function tuft(d: Decor, x: number, y: number, z: number, c: number, h = 1): void
 function reserved(x: number, z: number): boolean {
   const zz = Math.abs(z);
   if (Math.abs(x) <= 1.8 && x > -8 && x < 5) return true;
-  if (zz >= 27 && Math.abs(x) <= 8) return true;
+  if (zz >= 25 && Math.abs(x) <= 8) return true;
   if (Math.hypot(x, zz - MAP.fortZ) < 3) return true;
   if (Math.hypot(x - MAP.hill.x, z - MAP.hill.z) < 2.4) return true;
   return false;

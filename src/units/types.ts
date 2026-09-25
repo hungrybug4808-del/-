@@ -5,8 +5,8 @@ export type Pose = Record<string, number>;
 
 export type UnitType = 'archer' | 'cyclops' | 'dragon';
 export type Team = 0 | 1;
-/** 動ける場所。海は第3段階で追加 */
-export type Layer = 'land' | 'air';
+/** 動ける場所。モンスターはどれか1つの場所しか動けない */
+export type Layer = 'land' | 'sea' | 'air';
 export type UnitState = 'spawn' | 'move' | 'attack' | 'idle' | 'dead';
 
 export interface Rig {
@@ -63,6 +63,8 @@ export interface Unit<R extends Rig = Rig> {
   /** 羽ばたき・尻尾の位相（ドラゴン） */
   fp: number;
   tp: number;
+  layer: Layer;
+  /** layer === 'air' の省略形 */
   air: boolean;
   radius: number;
   retarget: number;
@@ -99,7 +101,7 @@ export interface UnitDef<R extends Rig = Rig> {
   hitAir: boolean;
   /** 遠距離攻撃か（高台で射程が伸びる） */
   ranged: boolean;
-  /** 地上にいるときに狙われる高さ */
+  /** 陸・海にいるときに狙われる高さ */
   hitH: number;
   barH: number;
   barW: number;

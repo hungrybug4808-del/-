@@ -100,7 +100,9 @@ function tap(e: PointerEvent): void {
   const hit = ray.intersectObjects(pickables, false)[0];
   if (!hit) return;
   const res = playerSpawn(hand.selected, hit.point.x, hit.point.z, hit.point.y);
-  if (res === 'place') toast(hit.point.z < TEAM[0].half ? 'そこには置けません（崖の上・深い水など）' : '自陣（光る線より手前）に置いてください');
+  if (res === 'half') toast('自陣（光る線より手前）に置いてください');
+  else if (res === 'land') toast('陸のモンスターは、立てる地面に置いてください');
+  else if (res === 'sea') toast('海のモンスターは、海や川の水の上に置いてください');
   else if (res === 'mana') toast('魔素が足りません');
 }
 

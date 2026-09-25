@@ -4,14 +4,17 @@ import { Vox, part } from '../core/voxel';
 import { glow, ring, sparkle } from '../fx/effects';
 import { camera, scene } from '../render/stage';
 import { MAP } from '../terrain/generate';
-import { groundY } from '../terrain/grid';
-import type { Team, Unit } from '../units/types';
+import { groundY, surfaceY } from '../terrain/grid';
+import type { Layer, Team, Unit } from '../units/types';
 import { BAR_BG, BAR_GEO } from './bars';
 import { TEAM, alive, hdist, notify, units } from './world';
 
 // 竜脈：上にしばらくいると占領でき、占領中は魔素の回復が速くなる
 
 export interface Vein {
+  /** 竜脈の場所（陸＝中央の丘、海＝海の真ん中、空＝浮島） */
+  layer: Layer;
+  name: string;
   pos: THREE.Vector3;
   g: THREE.Group;
   mat: THREE.MeshLambertMaterial;
@@ -26,6 +29,14 @@ export interface Vein {
 /** 占領中の竜脈1か所あたりの魔素回復の上乗せ */
 export const VEIN_BONUS = 0.5;
 const CAPTURE_R = 1.6;
+/** 戦う相手がいないとき、この距離までの竜脈には寄り道する */
+const DETOUR_R = 7.5;
+const VEIN_NAME: Record<Layer, string> = { land: '陸', sea: '海', air: '空' };
+
+/** その竜脈を占領できるか：空のモンスターはどこでも、陸・海は同じ場所の竜脈だけ */
+export function canCapture(u: Unit, v: Vein): boolean {
+  return u.air || u.layer === v.layer;
+}
 const CAPTURE_SPEED = 0.35;
 
 const veinV = new Vox();
@@ -38,9 +49,9 @@ for (let x = -4; x <= 3; x++)
     if (r > 2.6 && r < 4.2) veinV.set(x, -1, z, hash(x, 9, z) > 0.5 ? 0x6e737c : 0x8a8f99);
   }
 
-// 陸の竜脈（中央の丘の上）。海と空の竜脈は第3段階で足す
-export const veins: Vein[] = [MAP.hill].map(({ x, z }) => {
-  const y = groundY(x, z);
+export const veins: Vein[] = MAP.veins.map(({ x, z, layer }) => {
+  // 海の竜脈は水面から、空の竜脈は浮島の上から生える
+  const y = layer === 'sea' ? 0 : layer === 'air' ? surfaceY(x, z) : groundY(x, z);
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const g = part('vein', veinV, 0, -1, 0, 0.14, mat);
   g.position.set(x, y, z);
@@ -61,7 +72,7 @@ export const veins: Vein[] = [MAP.hill].map(({ x, z }) => {
   bar.add(bg, fill);
   bar.position.set(x, y + 1.3, z);
   scene.add(bar);
-  return { pos: new THREE.Vector3(x, y, z), g, mat, rm, bar, fill, meter: 0, owner: -1 as const };
+  return { layer, name: VEIN_NAME[layer], pos: new THREE.Vector3(x, y, z), g, mat, rm, bar, fill, meter: 0, owner: -1 as const };
 });
 
 export function ownedVeins(team: Team): number {
@@ -70,8 +81,9 @@ export function ownedVeins(team: Team): number {
 
 /** 進軍中のモンスターが寄り道する竜脈（まだ自軍のものでなく、進む先にあるもの） */
 export function veinFor(u: Unit): Vein | null {
-  let best: Vein | null = null, bd = 5.5;
+  let best: Vein | null = null, bd = DETOUR_R;
   for (const v of veins) {
+    if (!canCapture(u, v)) continue;
     if (u.team === 0 ? v.meter >= 1 : v.meter <= -1) continue;
     const ahead = u.team === 0 ? v.pos.z > u.pos.z - 1.5 : v.pos.z < u.pos.z + 1.5;
     if (!ahead) continue;
@@ -86,7 +98,7 @@ export function updateVeins(dt: number): void {
     let c0 = 0, c1 = 0;
     for (const u of units) {
       if (!alive(u) || u.state === 'spawn') continue;
-      if (hdist(u, v) < CAPTURE_R) { if (u.team === 0) c0++; else c1++; }
+      if (canCapture(u, v) && hdist(u, v) < CAPTURE_R) { if (u.team === 0) c0++; else c1++; }
     }
     const prev = v.owner;
     // 数が多いほど速い（3体まで）。両軍がいると止まる
@@ -101,8 +113,8 @@ export function updateVeins(dt: number): void {
         ring(v.pos, TEAM[own].color, 3, 0.6);
         sparkle({ x: v.pos.x, y: v.pos.y + 0.5, z: v.pos.z }, 24, [TEAM[own].color, 0xffffff], 1.5);
       }
-      if (own === 0) notify.toast('竜脈を占領！ 魔素の回復が速くなった');
-      else if (own === 1) notify.toast('敵に竜脈を占領された');
+      if (own === 0) notify.toast(v.name + 'の竜脈を占領！ 魔素の回復が速くなった');
+      else if (own === 1) notify.toast('敵に' + v.name + 'の竜脈を占領された');
     }
   }
 }

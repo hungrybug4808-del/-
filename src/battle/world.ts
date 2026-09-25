@@ -15,8 +15,8 @@ export interface TeamInfo {
 }
 
 export const TEAM: [TeamInfo, TeamInfo] = [
-  { color: 0x4aa3ff, castleZ: -32, half: -3, dir: 1 },
-  { color: 0xff5a5a, castleZ: 32, half: 3, dir: -1 },
+  { color: 0x4aa3ff, castleZ: -30, half: -3, dir: 1 },
+  { color: 0xff5a5a, castleZ: 30, half: 3, dir: -1 },
 ];
 export const inOwnHalf = (team: Team, z: number) => (team === 0 ? z < TEAM[0].half : z > TEAM[1].half);
 
@@ -28,7 +28,7 @@ export const game = { over: false, winner: -1 as -1 | Team, endT: 0 };
 /** 画面に短いメッセージを出す（UI 側が差し替える） */
 export const notify = { toast: (_msg: string): void => {} };
 
-/** 高台の射程アップ：相手より 1 高いごとに +0.5、最大 +2 */
+/** 高台の射程アップ：陸の遠距離が相手より 1 高いごとに +0.5、最大 +2 */
 export const HIGH_GROUND_PER = 0.5, HIGH_GROUND_MAX = 2;
 /** 近接攻撃が届く高さの差 */
 export const MELEE_DY = 1.0;
@@ -68,7 +68,7 @@ export function bldDist(u: { pos: THREE.Vector3 }, b: Building): number {
 /** 狙われる点の高さ */
 function aimY(t: Target): number {
   if (t.isBld) return t.pos.y + t.aimH;
-  return t.pos.y + (t.air ? 2.6 : t.d.hitH);
+  return t.pos.y + (t.layer === 'air' ? 2.6 : t.d.hitH);
 }
 /** 狙う点。from は攻撃する側の位置（魔王城は近い面を狙う） */
 export function aimPoint(t: Target, from: { x: number; z: number }): THREE.Vector3 {
@@ -82,17 +82,20 @@ export function aimPoint(t: Target, from: { x: number; z: number }): THREE.Vecto
 /** 遠距離モンスターの射程。陸の遠距離は高い所にいるほど伸びる */
 export function rangeOf(u: Unit, t: Target): number {
   const r = u.d.range;
-  if (!u.d.ranged || u.air) return r;
-  const ty = t.isBld ? t.pos.y : t.pos.y;
-  return r + cl((u.pos.y - ty) * HIGH_GROUND_PER, 0, HIGH_GROUND_MAX);
+  if (!u.d.ranged || u.layer !== 'land') return r;
+  return r + cl((u.pos.y - t.pos.y) * HIGH_GROUND_PER, 0, HIGH_GROUND_MAX);
 }
 
-/** 近接は同じ場所（陸どうし）で、段差の上下にいない相手だけ */
+/**
+ * 攻撃が当たるか。遠距離は陸・海・空どこにでも当たる（hitAir が false なら空以外）。
+ * 近接は同じ場所の相手だけで、陸どうしは段差の上下にいないこと。
+ * 建物（水辺の魔王城を含む）は、陸・海の近接も高さがそろえば叩ける。
+ */
 export function canHit(u: Unit, t: Target): boolean {
   if (t.isBld) return u.d.ranged || u.air || Math.abs(u.pos.y - t.pos.y) <= MELEE_DY;
-  if (t.air && !u.d.hitAir) return false;
-  if (!u.d.ranged && !u.air && !t.air && Math.abs(u.pos.y - t.pos.y) > MELEE_DY) return false;
-  return true;
+  if (u.d.ranged) return t.layer !== 'air' || u.d.hitAir;
+  if (t.layer !== u.layer) return false;
+  return u.layer !== 'land' || Math.abs(u.pos.y - t.pos.y) <= MELEE_DY;
 }
 
 export function inRange(u: Unit): boolean {
