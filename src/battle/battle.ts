@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { rnd } from '../core/math';
-import { DEF } from '../units/registry';
+import { DEF, HAND } from '../units/registry';
 import type { Team, UnitType } from '../units/types';
 import { forts, resetBuildings, updateBuildings } from './buildings';
 import { clearArrows, fireArrowFrom, updateArrows } from './projectiles';
 import { clearUnits, spawnUnit, updateUnits } from './units';
 import { VEIN_BONUS, drawVeins, ownedVeins, resetVeins, updateVeins } from './veins';
-import { SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, blocked, cellAt, passable, seaLevel, walkY } from '../terrain/grid';
+import { NX, NZ, SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, blocked, cellAt, cx, cz, passable, seaLevel, walkY } from '../terrain/grid';
 import { alive, bldAlive, game, hdist, inOwnHalf, units } from './world';
 
 // 1試合の進行：魔素・砦・竜脈・CPU・勝敗
@@ -44,22 +44,36 @@ function updateForts(dt: number): void {
   }
 }
 
+/** CPU が海のモンスターを出す水面（自陣の、海につながる水） */
+let cpuSea: [number, number][] | null = null;
+function cpuSeaSpots(): [number, number][] {
+  if (!cpuSea) {
+    cpuSea = [];
+    for (let iz = 0; iz < NZ; iz++)
+      for (let ix = 0; ix < NX; ix++) {
+        const x = cx(ix), z = cz(iz);
+        if (z > 12 && canSpawnAt('kappa', 1, x, z)) cpuSea.push([x, z]);
+      }
+  }
+  return cpuSea;
+}
+const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
+
 function cpuThink(dt: number): void {
   cpu.t -= dt;
   if (cpu.t > 0) return;
   cpu.t = 0.7;
   if (!cpu.next) {
-    // ドラゴンを出されたら弓兵を増やす
-    const pDragon = units.some(u => u.team === 0 && u.type === 'dragon' && alive(u));
-    const r = Math.random();
-    cpu.next = pDragon && r < 0.55 ? 'archer' : r < 0.45 ? 'archer' : r < 0.75 ? 'cyclops' : 'dragon';
+    // 空の敵が多ければ、空を撃てる遠距離を増やす
+    const airFoes = units.filter(u => u.team === 0 && u.air && alive(u)).length;
+    cpu.next = airFoes >= 2 && Math.random() < 0.55 ? pick<UnitType>(['archer', 'centaur', 'siren', 'tengu']) : pick(HAND);
   }
-  const cost = DEF[cpu.next].cost;
+  const d = DEF[cpu.next], cost = d.cost;
   if (cpu.mana >= cost && Math.random() < 0.6) {
-    const n = cpu.next === 'archer' ? Math.min(2, Math.floor(cpu.mana)) : 1;
-    // 自陣の、砦と魔王城のあいだあたりの出せる場所
+    const n = cost === 1 ? Math.min(2, Math.floor(cpu.mana)) : 1;
     for (let tries = 0; tries < 30; tries++) {
-      const x = rnd(-6, 6), z = rnd(12, 27);
+      // 自陣の、砦と魔王城のあいだあたり（海のモンスターは自陣の海）
+      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots()) : [rnd(-6, 6), rnd(12, 27)];
       if (!canSpawnAt(cpu.next, 1, x, z)) continue;
       for (let i = 0; i < n; i++) {
         const sx = x + (i - 1) * 0.8, sz = z + rnd(-0.3, 0.3), ok = canSpawnAt(cpu.next, 1, sx, sz);

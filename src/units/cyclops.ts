@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { eIn, eOut, hash, kf, rnd, seg, vec, type Key } from '../core/math';
 import { Vox, part } from '../core/voxel';
-import { addShake, dust, ring, solid } from '../fx/effects';
-import { alive, canHit, hurt, hurtBld, units } from '../battle/world';
+import { addShake, dust, glow, ring, solid } from '../fx/effects';
+import { alive, bldAlive, bldDist, blds, canHit, hurt, hurtBld, units } from '../battle/world';
+import { groundY } from '../terrain/grid';
 import type { Pose, Rig, Unit, UnitDef } from './types';
 
-// サイクロプス：約2頭身、水色の肌、黄色い虹彩に縦長の瞳の一つ目、ツノ1本、トゲ付き棍棒
+// サイクロプス：約2頭身、水色の肌、黄色い虹彩に縦長の瞳の一つ目、ツノ1本、トゲ付き棍棒。
+// 巨体でとても遅い切り札。ごくまれに目からピンクのビームを撃つ
 
 const CY = {
   SKIN: 0x7fd0e8, SKIN_D: 0x58aac8, SKIN_L: 0xb2e8f5, HORN: 0xf2e8cf, HORN_D: 0xc9b894,
@@ -74,10 +76,22 @@ const cyLL = cyLeg(-5), cyLR = cyLeg(1);
 export interface CyclopsRig extends Rig {
   legL: THREE.Group; legR: THREE.Group; torso: THREE.Group; head: THREE.Group; pupil: THREE.Group;
   armL: THREE.Group; armR: THREE.Group; tip: THREE.Object3D;
+  beam: THREE.Group; beamO: THREE.Mesh; beamI: THREE.Mesh; flare: THREE.Mesh;
 }
+/** 見た目の大きさ（1ボクセル） */
+const S = 0.14;
+
+// ---- 目からのビーム（試作 cyclops.html と同じ作り） ----
+const BEAM_GEO = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true);
+BEAM_GEO.rotateX(Math.PI / 2);
+BEAM_GEO.translate(0, 0, 0.5);
+const addMat = (c: number, o: number, side: THREE.Side = THREE.FrontSide) =>
+  new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side });
+const BEAM_O = addMat(0xff4fbf, 0.6, THREE.DoubleSide), BEAM_I = addMat(0xffeaf7, 0.95), FLARE = addMat(0xff7fd4, 0.8);
+const FLARE_GEO = new THREE.BoxGeometry(1, 1, 1);
 
 function makeCyclops(mat: THREE.Material): CyclopsRig {
-  const s = 0.1, root = new THREE.Group();
+  const s = S, root = new THREE.Group();
   root.rotation.order = 'YXZ';
   const legL = part('cyLL', cyLL, -3, 5, 0, s, mat); legL.position.set(-3 * s, 5 * s, 0); root.add(legL);
   const legR = part('cyLR', cyLR, 3, 5, 0, s, mat); legR.position.set(3 * s, 5 * s, 0); root.add(legR);
@@ -88,7 +102,11 @@ function makeCyclops(mat: THREE.Material): CyclopsRig {
   const armR = part('cyAR', cyAR, 8, 11, 0, s, mat); armR.position.set(8 * s, 6 * s, 0); torso.add(armR);
   const club = part('cyC', cyC, 8.5, 3, 0, s, mat); club.position.set(0.5 * s, -8 * s, 0); armR.add(club);
   const tip = new THREE.Object3D(); tip.position.set(0, 0.5 * s, 13.5 * s); club.add(tip);
-  return { root, legL, legR, torso, head, pupil, armL, armR, tip };
+  const eye = new THREE.Object3D(); eye.position.set(0, 5.5 * s, 6.2 * s); head.add(eye);
+  const beam = new THREE.Group(); beam.visible = false; eye.add(beam);
+  const beamO = new THREE.Mesh(BEAM_GEO, BEAM_O), beamI = new THREE.Mesh(BEAM_GEO, BEAM_I), flare = new THREE.Mesh(FLARE_GEO, FLARE);
+  beam.add(beamO, beamI, flare);
+  return { root, legL, legR, torso, head, pupil, armL, armR, tip, beam, beamO, beamI, flare };
 }
 
 function pose(u: Unit<CyclopsRig>, T: Pose, dt: number): void {
@@ -108,6 +126,21 @@ function pose(u: Unit<CyclopsRig>, T: Pose, dt: number): void {
       addShake(0.02);
     }
     u.prevC = c;
+  } else if (u.state === 'attack' && u.atk === 'beam') {
+    // 必殺：目を光らせて溜め、光線で前方を左右になぎ払う
+    const aim = Math.min(0.9, Math.max(0.1, u.aimPitch || 0.33));
+    T.headRX = K([[0, 0], [1.2, -0.22], [1.35, aim, eOut], [2.9, aim], [3.8, 0]]);
+    T.headRY = K([[0, 0], [1.35, -0.42], [2.85, 0.42], [3.8, 0]]);
+    T.torsoRY = 0.35 * T.headRY;
+    T.torsoRX = K([[0, 0], [1.2, -0.12], [1.35, 0.1, eOut], [2.9, 0.08], [3.8, 0]]);
+    T.armLZ = K([[0, -0.05], [0.6, -0.5], [3.0, -0.5], [3.8, -0.05]]);
+    T.armRZ = K([[0, 0.05], [0.6, 0.5], [3.0, 0.5], [3.8, 0.05]]);
+    T.armLX = K([[0, 0], [0.6, 0.2], [3.0, 0.2], [3.8, 0]]);
+    T.legL = K([[0, 0], [0.5, -0.3], [3.2, -0.3], [3.8, 0]]);
+    T.legR = K([[0, 0], [0.5, 0.25], [3.2, 0.25], [3.8, 0]]);
+    T.rootY = K([[0, 0], [0.5, -0.05], [3.2, -0.05], [3.8, 0]]);
+    if (t < 1.2) T.torsoRZ = 0.015 * Math.sin(t * 50) * seg(t, 0, 1.2) ** 2;
+    else if (t < 2.9) T.torsoRZ = 0.01 * Math.sin(t * 70);
   } else if (u.state === 'attack' && u.atk === 'unit') {
     // モンスターへ：左右にゆっくり重く振り回し、勢いに体を持っていかれる
     T.torsoRY = K([[0, 0], [0.55, 1.0], [0.8, -1.2, eOut], [1.0, -1.25], [1.5, 0]]);
@@ -161,19 +194,78 @@ function apply(u: Unit<CyclopsRig>): void {
   r.legR.rotation.x = P.legR;
   r.armL.rotation.set(P.armLX, 0, P.armLZ);
   r.armR.rotation.set(P.armRX, 0, P.armRZ);
-  r.pupil.position.x = P.pupil * 0.1;
+  r.pupil.position.x = P.pupil * S;
+  if (!(u.state === 'attack' && u.atk === 'beam')) r.beam.visible = false;
 }
 
 const V = new THREE.Vector3();
 const DMG = 60, CASTLE_DMG = 230;
 
-function attack(u: Unit<CyclopsRig>, _dt: number, ok: boolean): void {
+const E = new THREE.Vector3(), DIR = new THREE.Vector3(), QW = new THREE.Quaternion(), A = new THREE.Vector3();
+const BEAM_LEN = 12, BEAM_DPS = 140, BEAM_BLD_DPS = 110;
+/** 必殺技は攻撃のたびに 8% の確率。一度撃ったら 15 秒は撃たない */
+const BEAM_CHANCE = 0.08, BEAM_COOL = 15;
+
+function beamTick(u: Unit<CyclopsRig>, dt: number): void {
+  const r = u.rig, t = u.st;
+  if (t < 1.2) {
+    // 溜め：目に光の粒が吸い込まれる
+    if (Math.random() < 0.8) {
+      r.beam.getWorldPosition(E);
+      const a = Math.random() * Math.PI * 2, b = rnd(-0.8, 0.8), rr = rnd(0.7, 1.2);
+      const o = { x: Math.cos(a) * rr, y: b, z: Math.sin(a) * rr };
+      glow.spawn(vec(E.x + o.x, E.y + o.y, E.z + o.z), vec(-o.x * 1.7, -o.y * 1.7, -o.z * 1.7), 0.55, rnd(0.04, 0.07), Math.random() < 0.6 ? 0xff5fc8 : 0xffffff, 0);
+    }
+  }
+  if (t >= 1.3 && !u.fired.fire) { u.fired.fire = 1; addShake(0.2); }
+  const firing = t >= 1.3 && t < 2.9;
+  r.beam.visible = firing;
+  if (!firing) return;
+  addShake(0.06);
+  const f = seg(t, 1.3, 1.4) * (1 - seg(t, 2.75, 2.9));
+  r.beam.getWorldPosition(E);
+  DIR.set(0, 0, 1).applyQuaternion(r.beam.getWorldQuaternion(QW));
+  // 地形に当たるところまで
+  let L = BEAM_LEN;
+  for (let d = 0.5; d <= BEAM_LEN; d += 0.25) {
+    A.copy(E).addScaledVector(DIR, d);
+    if (A.y <= groundY(A.x, A.z)) { L = d; break; }
+  }
+  const pulse = 1 + 0.18 * Math.sin(t * 45);
+  r.beamO.scale.set(0.2 * pulse * f, 0.2 * pulse * f, L);
+  r.beamI.scale.set(0.08 * f, 0.08 * f, L);
+  r.flare.scale.setScalar(0.5 * pulse * f + 0.001);
+  // 光線に触れた敵（陸・海・空どれでも）と建物
+  for (const e of units) {
+    if (e.team === u.team || !alive(e)) continue;
+    A.set(e.pos.x, e.pos.y + (e.air ? 2.6 : e.d.hitH), e.pos.z).sub(E);
+    const along = Math.max(0, Math.min(L, A.dot(DIR)));
+    if (A.addScaledVector(DIR, -along).length() < 0.7 + e.radius * 0.6) hurt(e, BEAM_DPS * dt);
+  }
+  for (const b of blds) {
+    if (b.team === u.team || !bldAlive(b)) continue;
+    for (let d = 1; d <= L; d += 0.5) {
+      A.copy(E).addScaledVector(DIR, d);
+      if (bldDist({ pos: A }, b) < 0.4 && A.y < b.pos.y + 4) { hurtBld(b, BEAM_BLD_DPS * dt); break; }
+    }
+  }
+  if (L < BEAM_LEN) {
+    A.copy(E).addScaledVector(DIR, L);
+    for (let i = 0; i < 3; i++) glow.spawn(vec(A.x, A.y + 0.05, A.z), vec(rnd(-1.5, 1.5), rnd(1, 3), rnd(-1.5, 1.5)), rnd(0.3, 0.6), rnd(0.05, 0.1), Math.random() < 0.7 ? 0xff5fc8 : 0xffffff, 6);
+    if (Math.random() < 0.5) dust({ x: A.x, z: A.z }, 1, 0.8);
+    u.mem.ringT = (u.mem.ringT ?? 0) - dt;
+    if (u.mem.ringT <= 0) { ring({ x: A.x, z: A.z }, 0xff5fc8, 1.2, 0.35); u.mem.ringT = 0.12; }
+  }
+}
+
+function attack(u: Unit<CyclopsRig>, dt: number, ok: boolean): void {
+  if (u.atk === 'beam') { beamTick(u, dt); return; }
   if (u.atk === 'unit' && u.st >= 0.72 && !u.fired.hit) {
     // 振り回しは前方の地上の敵をまとめて叩く
     u.fired.hit = 1;
-    const px = u.pos.x + Math.sin(u.yaw) * 1.3, pz = u.pos.z + Math.cos(u.yaw) * 1.3;
+    const px = u.pos.x + Math.sin(u.yaw) * 1.8, pz = u.pos.z + Math.cos(u.yaw) * 1.8;
     for (const e of units)
-      if (e.team !== u.team && alive(e) && canHit(u, e) && Math.hypot(e.pos.x - px, e.pos.z - pz) < 1.7 + e.radius) hurt(e, DMG);
+      if (e.team !== u.team && alive(e) && canHit(u, e) && Math.hypot(e.pos.x - px, e.pos.z - pz) < 2.2 + e.radius) hurt(e, DMG);
     dust({ x: px, y: u.pos.y, z: pz }, 8, 0.9);
     addShake(0.05);
   }
@@ -192,13 +284,21 @@ function attack(u: Unit<CyclopsRig>, _dt: number, ok: boolean): void {
 
 export const cyclops: UnitDef<CyclopsRig> = {
   type: 'cyclops', name: 'サイクロプス', icon: '👁️', sub: '陸・近接', cost: 5,
-  hp: 650, speed: 0.55, range: 1.5, aggro: 4.5, radius: 0.9, layer: 'land', hitAir: false, ranged: false, hitH: 1.6,
-  barH: 3.5, barW: 1.4, ringR: 1.0, spawnT: 0.8, deathT: 2.2, smooth: 14,
+  hp: 1300, speed: 0.55, range: 2.0, aggro: 5.5, radius: 1.2, layer: 'land', hitAir: false, ranged: false, hitH: 2.2,
+  barH: 4.9, barW: 1.8, ringR: 1.4, spawnT: 0.8, deathT: 2.2, smooth: 14,
   make: makeCyclops,
   base: () => ({
     rootY: 0, rootRX: 0, rootS: 1, torsoRX: 0, torsoRY: 0, torsoRZ: 0, torsoSY: 1, headRX: 0, headRY: 0,
     legL: 0, legR: 0, armLX: 0, armLZ: -0.05, armRX: 0, armRZ: 0.05, pupil: 0,
   }),
-  cycle: u => (u.atk === 'castle' ? 2.6 : 1.5),
+  cycle: u => (u.atk === 'beam' ? 3.9 : u.atk === 'castle' ? 2.6 : 1.5),
+  startAttack(u) {
+    u.rig.beam.visible = false;
+    if (u.life - (u.mem.beamAt ?? -BEAM_COOL) >= BEAM_COOL && Math.random() < BEAM_CHANCE) {
+      u.atk = 'beam';
+      u.mem.beamAt = u.life;
+    }
+  },
+  aim(u, p, hd) { u.aimPitch = Math.atan2(u.pos.y + 2.45 - p.y, Math.max(hd, 0.5)); },
   pose, apply, attack,
 };

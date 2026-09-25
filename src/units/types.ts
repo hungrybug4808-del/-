@@ -3,7 +3,10 @@ import type * as THREE from 'three';
 /** ポーズ（関節ごとの角度など）。毎フレーム目標値へなめらかに近づける */
 export type Pose = Record<string, number>;
 
-export type UnitType = 'archer' | 'cyclops' | 'dragon';
+export type UnitType =
+  | 'goblin' | 'archer' | 'oni' | 'centaur' | 'cyclops'
+  | 'kappa' | 'siren' | 'kraken'
+  | 'harpy' | 'griffon' | 'tengu' | 'dragon';
 export type Team = 0 | 1;
 /** 動ける場所。モンスターはどれか1つの場所しか動けない */
 export type Layer = 'land' | 'sea' | 'air';
@@ -53,9 +56,12 @@ export interface Unit<R extends Rig = Rig> {
   /** 今の状態になってからの時間 */
   st: number;
   life: number;
-  atk: 'unit' | 'castle' | null;
+  /** 攻撃の種類。beam はサイクロプスの必殺技 */
+  atk: 'unit' | 'castle' | 'beam' | null;
   target: Target | null;
   P: Pose;
+  /** 状態をまたいで覚えておく値（必殺技の最後の使用時刻など） */
+  mem: Record<string, number>;
   /** 状態中に一度だけ起こすイベント（攻撃の当たりなど）の記録 */
   fired: Record<string, number>;
   walk: number;
@@ -122,6 +128,8 @@ export interface UnitDef<R extends Rig = Rig> {
   post?(u: Unit<R>): void;
   /** 攻撃中の狙いの角度を決める。p は狙う点、hd は水平距離 */
   aim?(u: Unit<R>, p: THREE.Vector3, hd: number): void;
+  /** 攻撃の1回ごとの始めに呼ぶ（攻撃の種類を選ぶ） */
+  startAttack?(u: Unit<R>): void;
   /** 攻撃中の毎フレーム処理。ok は狙いがまだ有効か */
   attack(u: Unit<R>, dt: number, ok: boolean): void;
   dispose?(u: Unit<R>): void;

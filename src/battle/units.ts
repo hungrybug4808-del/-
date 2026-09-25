@@ -50,7 +50,7 @@ export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Uni
 
   const u: Unit = {
     isBld: false, type, team, d, rig, mat, hp: d.hp, pos: new THREE.Vector3(x, y, z), yaw, yawS: yaw,
-    state: 'spawn', st: 0, life: 0, atk: null, target: null, P: d.base(), fired: {},
+    state: 'spawn', st: 0, life: 0, atk: null, target: null, P: d.base(), fired: {}, mem: {},
     walk: Math.random() * 6, flash: 0, fp: Math.random() * 6, tp: 0, layer, air, radius: d.radius,
     retarget: 0, aimPitch: 0, inhale: 0, ringM, bar, fill, path: [], pathT: 0, pathGoal: null,
   };
@@ -207,7 +207,7 @@ function unitLogic(u: Unit, dt: number): void {
     }
     d.attack(u, dt, ok);
     if (u.st >= d.cycle(u)) {
-      if (validTarget(u) && inRange(u)) { u.st = 0; u.fired = {}; }
+      if (validTarget(u) && inRange(u)) { u.st = 0; u.fired = {}; u.atk = u.target!.isBld ? 'castle' : 'unit'; d.startAttack?.(u); }
       else setState(u, 'move');
     }
     return;
@@ -232,6 +232,7 @@ function unitLogic(u: Unit, dt: number): void {
   if (inRange(u)) {
     setState(u, 'attack');
     u.atk = t.isBld ? 'castle' : 'unit';
+    d.startAttack?.(u);
     return;
   }
   if (u.state !== 'move') setState(u, 'move');
