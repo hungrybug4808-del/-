@@ -73,8 +73,12 @@ function cpuThink(dt: number): void {
   if (cpu.mana >= cost && Math.random() < 0.6) {
     const n = cost === 1 ? Math.min(2, Math.floor(cpu.mana)) : 1;
     for (let tries = 0; tries < 30; tries++) {
-      // 自陣の、砦と魔王城のあいだあたり（海のモンスターは自陣の海）
-      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots()) : [rnd(-6, 6), rnd(12, 27)];
+      // 陸は3本の道のどれか（中央・南・北）の自陣側、空は中央、海は自陣の海
+      const lane = Math.random();
+      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots())
+        : d.layer === 'air' || lane < 0.5 ? [rnd(-6, 6), rnd(12, 27)]
+        : lane < 0.8 ? [rnd(-15, -11.5), rnd(17, 24)]
+        : [rnd(11, 16), rnd(17.5, 22.5)];
       if (!canSpawnAt(cpu.next, 1, x, z)) continue;
       for (let i = 0; i < n; i++) {
         const sx = x + (i - 1) * 0.8, sz = z + rnd(-0.3, 0.3), ok = canSpawnAt(cpu.next, 1, sx, sz);

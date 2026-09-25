@@ -5,7 +5,7 @@ import { camera, scene } from '../render/stage';
 import { DEF } from '../units/registry';
 import { RAW_KEYS, type Building, type Flag, type Target, type Team, type Unit, type UnitType } from '../units/types';
 import { BAR_BG, BAR_GEO } from './bars';
-import { bldEvents } from './buildings';
+import { bldEvents, forts } from './buildings';
 import { flagMode } from './flags';
 import { veinFor } from './veins';
 import { Bio } from '../terrain/biomes';
@@ -13,6 +13,7 @@ import {
   NX, NZ, SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, biome, cellAt, cx, cz, groundY, passable, seaLevel, seaY, surfaceY, type NavLayer,
 } from '../terrain/grid';
 import { FlowField, canStep, findPath, walkable } from '../terrain/nav';
+import { laneAt, laneMask, type Lane } from '../terrain/lanes';
 import {
   TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, buffed, canHit, game, hdist, hooks, inRange, notify, rangeOf, setState, units, validTarget,
 } from './world';
@@ -88,7 +89,7 @@ function chooseTarget(u: Unit): void {
   let bb: Building | null = null, bbd = 1e9;
   const c = cellAt(u.pos.x, u.pos.z);
   for (const b of blds) {
-    if (b.team === u.team || !bldAlive(b)) continue;
+    if (b.team === u.team || !bldAlive(b) || shielded(u, b)) continue;
     // 陸・海のモンスターは、たどり着けない建物（海から届かない砦など）は狙わない
     if (!u.air && fieldFor(b, navOf(u)).dist[c] === Infinity && bldDist(u, b) > u.d.range) continue;
     const d = bldDist(u, b);
@@ -97,13 +98,30 @@ function chooseTarget(u: Unit): void {
   u.target = bb;
 }
 
+/**
+ * 砦が守っている魔王城：砦にたどり着けるモンスターは、その砦を落とすまで魔王城を狙わない。
+ * 砦に行けない海のモンスターは、裏の海から魔王城を攻撃できる
+ */
+function shielded(u: Unit, b: Building): boolean {
+  if (b.kind !== 'castle') return false;
+  const f = forts[b.team];
+  if (!bldAlive(f)) return false;
+  return u.air || fieldFor(f, navOf(u)).dist[cellAt(u.pos.x, u.pos.z)] < Infinity;
+}
+
 // ---- 移動 ----
 
-/** 建物へ向かう距離の地図（建物ごと・陸と海ごとに1つ。建物が崩れたら作り直す） */
-const fields: [Map<Building, FlowField>, Map<Building, FlowField>] = [new Map(), new Map()];
-bldEvents.changed = () => { fields[0].clear(); fields[1].clear(); };
-function fieldFor(b: Building, lay: NavLayer): FlowField {
-  let f = fields[lay].get(b);
+/**
+ * 建物へ向かう距離の地図（建物ごと・陸と海ごと・道ごとに1つ。建物が崩れたら作り直す）。
+ * 陸のモンスターは中盤では今いる道の中だけを進む（lane）。-1 は道を問わない
+ */
+const fields = new Map<string, FlowField>();
+const bldIds = new Map<Building, number>();
+bldEvents.changed = () => fields.clear();
+function fieldFor(b: Building, lay: NavLayer, lane: Lane = -1): FlowField {
+  if (!bldIds.has(b)) bldIds.set(b, bldIds.size);
+  const key = bldIds.get(b) + ':' + lay + ':' + lane;
+  let f = fields.get(key);
   if (!f) {
     // 敷地のすぐ外がゴール。海は、建物に一番近い水面の並び
     const near: [number, number][] = [];
@@ -114,7 +132,7 @@ function fieldFor(b: Building, lay: NavLayer): FlowField {
       }
     const reach = lay === 0 ? 0.8 : Math.min(...near.map(n => n[1])) + 0.35;
     const goals = near.filter(n => n[1] <= reach).map(n => n[0]);
-    fields[lay].set(b, (f = new FlowField(goals, lay)));
+    fields.set(key, (f = new FlowField(goals, lay, lane >= 0 ? laneMask(lane as 0 | 1 | 2) : undefined)));
   }
   return f;
 }
@@ -148,7 +166,7 @@ function followFlag(u: Unit, f: Flag, dt: number): void {
     const ok = arrived ? dd < d.aggro && Math.hypot(e.pos.x - f.x, e.pos.z - f.z) < GUARD_R + d.range : dd - u.radius * 0.5 <= rangeOf(u, e);
     if (ok && dd < bd) { bd = dd; best = e; }
   }
-  if (!best) for (const b of blds) if (b.team !== u.team && bldAlive(b) && canHit(u, b) && bldDist(u, b) <= rangeOf(u, b) + 0.1) { best = b; break; }
+  if (!best) for (const b of blds) if (b.team !== u.team && bldAlive(b) && !shielded(u, b) && canHit(u, b) && bldDist(u, b) <= rangeOf(u, b) + 0.1) { best = b; break; }
   u.target = best;
   if (best && inRange(u)) {
     setState(u, 'attack');
@@ -165,6 +183,18 @@ function followFlag(u: Unit, f: Flag, dt: number): void {
     if (u.state !== 'move') setState(u, 'move');
     moveToward(u, f.x, f.z, dt, u.air ? undefined : flagField(f, navOf(u)));
   } else if (u.state !== 'idle') setState(u, 'idle');
+}
+
+/** 自動で進むときの地図：陸は中盤なら今いる道の中だけ（その道から行けなければ道を問わない） */
+function laneField(u: Unit, b: Building): FlowField {
+  const lay = navOf(u);
+  if (lay === 1) return fieldFor(b, 1);
+  const lane = laneAt(u.pos.x, u.pos.z);
+  if (lane >= 0) {
+    const f = fieldFor(b, 0, lane);
+    if (f.dist[cellAt(u.pos.x, u.pos.z)] < Infinity) return f;
+  }
+  return fieldFor(b, 0);
 }
 
 /** 陸・海：地形で通れない方向へは進まず、壁に沿って滑る */
@@ -293,7 +323,7 @@ function unitLogic(u: Unit, dt: number): void {
   if (u.state !== 'move') setState(u, 'move');
   if (t.isBld) {
     const p = bldPoint(t, u.pos.x, u.pos.z);
-    moveToward(u, p.x, p.z, dt, u.air ? undefined : fieldFor(t, navOf(u)));
+    moveToward(u, p.x, p.z, dt, u.air ? undefined : laneField(u, t));
   } else moveToward(u, t.pos.x, t.pos.z, dt);
 }
 

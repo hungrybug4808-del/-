@@ -19,11 +19,12 @@ export function canStep(a: number, b: number, lay: NavLayer = 0): boolean {
 }
 
 /** マス c から方向 k へ進めるなら行き先のマス、進めなければ -1 */
-function neighbor(c: number, k: number, lay: NavLayer): number {
+function neighbor(c: number, k: number, lay: NavLayer, mask?: Uint8Array): number {
   const ix = c % NX, iz = (c / NX) | 0, [dx, dz] = DIRS[k];
   const nx = ix + dx, nz = iz + dz;
   if (nx < 0 || nx >= NX || nz < 0 || nz >= NZ) return -1;
   const n = colOf(nx, nz);
+  if (mask && !mask[n]) return -1;
   if (!canStep(c, n, lay)) return -1;
   if (dx && dz && !cornerOk(c, colOf(nx, iz), colOf(ix, nz), n, lay)) return -1;
   return n;
@@ -72,13 +73,14 @@ class Heap {
 /** 目的地（複数のマス）までの距離の地図。動かない目的地（建物）に使う */
 export class FlowField {
   readonly dist = new Float32Array(NC).fill(Infinity);
-  constructor(goals: number[], readonly lay: NavLayer = 0) {
+  /** mask を渡すと、印のあるマスだけを通る（道ごとの進路） */
+  constructor(goals: number[], readonly lay: NavLayer = 0, readonly mask?: Uint8Array) {
     const h = new Heap();
     for (const g of goals) if (passable(g, lay)) { this.dist[g] = 0; h.push(g, 0); }
     while (h.size) {
       const c = h.pop(), dc = this.dist[c];
       for (let k = 0; k < 8; k++) {
-        const n = neighbor(c, k, lay);
+        const n = neighbor(c, k, lay, mask);
         if (n < 0) continue;
         const nd = dc + DIRS[k][2];
         if (nd < this.dist[n]) { this.dist[n] = nd; h.push(n, nd); }
@@ -97,7 +99,7 @@ export class FlowField {
     for (let s = 0; s < 8; s++) {
       let bn = -1, bd = this.dist[c];
       for (let k = 0; k < 8; k++) {
-        const n = neighbor(c, k, this.lay);
+        const n = neighbor(c, k, this.lay, this.mask);
         if (n >= 0 && this.dist[n] < bd) { bd = this.dist[n]; bn = n; }
       }
       if (bn < 0) break;

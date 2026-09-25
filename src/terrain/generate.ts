@@ -8,6 +8,8 @@ import {
 // x の南（−）から北（＋）へ：
 //   海の通り道 → 南の低地（海岸・砂浜・砂漠・荒野・沼地）→ 中央の平らな道（平原・草原・中央の丘）
 //   → 丘陵と森林 → 絶壁の上の高台（谷・渡河点・洞窟）→ 山岳と高山（湖・滝）
+// 陸の道は3本：北（高台）・中央（丘と渡河点）・南（海沿いの砂漠と沼地）。
+// 中央と南は岩の尾根で区切り、途中の峠で乗り換えられる。中央の丘陵から高台へも途中の坂で上がれる。
 // 川は山の湖から滝で高台へ、もう一度滝で低地へ落ち、中央の丘の両側に分かれて沼地から海へ注ぐ。
 
 // ---- ノイズ（z は |z| で使うので左右対称になる） ----
@@ -42,6 +44,13 @@ const shoreX = (zz: number) => -17 + 0.8 * (vn(zz / 3, 0, 11) - 0.5);
 /** 低地の川の中心の |z|。中央の丘の両側で2本に分かれる */
 const riverZ = (x: number) => 6.2 * smooth(-9, -6, x) * (1 - smooth(3, 6, x));
 const RIVER_W = 1.2;
+
+/** 中央と南を区切る岩の尾根。峠（pass）だけ通れる */
+export const RIDGE = { x0: -10.5, x1: -8, z0: 0, z1: 22.5, pass: [12, 14.5] as const };
+/** 中央の丘陵から高台へ上がる坂 */
+export const RAMP = { x0: 5, x1: 10, z0: 8.5, z1: 11 };
+/** 渡河点と洞窟の幅（道を広げる） */
+const FORD_HALF = 2.5, CAVE_X0 = 11.5, CAVE_X1 = 16;
 
 export const MAP = {
   castleZ: 30,
@@ -78,13 +87,20 @@ function column(x: number, zz: number): Col {
   // 低地の川（中央の道の上では渡河点、沼地では浅い）
   if (x < 10 && Math.abs(zz - riverZ(x)) < RIVER_W) {
     if (x >= 9.5) return { h: -1.5, mat: B.GRAVEL, sub: B.STONE, water: 0, falls: [0, 2.5], bio: Bio.FALLS };
-    if (Math.abs(x) <= 1.5) return { h: -0.5, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.FORD };
-    if (x < -8) return { h: -0.5, mat: B.MUD, sub: B.MUD, water: 0, bio: Bio.SWAMP };
+    if (Math.abs(x) <= FORD_HALF) return { h: -0.5, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.FORD };
+    // 尾根を横切る所は深く（陸では渡れない）、その先の沼地では浅い
+    if (x < RIDGE.x0) return { h: -0.5, mat: B.MUD, sub: B.MUD, water: 0, bio: Bio.SWAMP };
     return { h: x >= 8 ? -1.5 : -1.0, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.RIVER };
   }
 
   // 魔王城の前庭
   if (zz >= 25.5 && Math.abs(x) <= 7.5) return { h: 0, mat: Math.abs(x) <= 1.5 ? B.PATH : B.GRASS, sub: B.DIRT, bio: Bio.PLAIN };
+
+  // 中央と南を区切る岩の尾根と、乗り換えの峠
+  if (x >= RIDGE.x0 && x < RIDGE.x1 && zz >= RIDGE.z0 && zz < RIDGE.z1) {
+    if (zz >= RIDGE.pass[0] && zz < RIDGE.pass[1]) return { h: 0.5, mat: B.GRAVEL, sub: B.DIRT, bio: Bio.HILLS };
+    return { h: q(2.5 + 1.2 * vn(x / 1.5, zz / 1.5, 45)), mat: B.STONE, sub: B.STONE, bio: Bio.MOUNTAIN };
+  }
 
   // 南の低地
   if (x < -8) {
@@ -115,6 +131,10 @@ function column(x: number, zz: number): Col {
   // 城の横（高台からの下り口）
   if (zz >= 29 && x < 17) return { h: 0, mat: B.GRASS, sub: B.DIRT, bio: Bio.PLAIN };
 
+  // 丘陵から高台へ上がる坂（道の乗り換え）
+  if (x >= RAMP.x0 && x < RAMP.x1 && zz >= RAMP.z0 && zz < RAMP.z1)
+    return { h: q(Math.min(3.5, Math.max(0.5, ((x - RAMP.x0) / (RAMP.x1 - RAMP.x0)) * 4))), mat: B.PATH, sub: B.DIRT, bio: Bio.HILLS };
+
   // 丘陵と森林（ところどころ崖のある段丘）
   if (x < 10) {
     const forest = vn(x / 3, zz / 3, 81) > 0.45;
@@ -128,14 +148,14 @@ function column(x: number, zz: number): Col {
     const P = zz <= 23 ? 4 : q(4 * (1 - (zz - 23) / 6));
     if (zz >= 14 && zz < 17.5) {
       // 尾根を貫く洞窟
-      if (x >= 12 && x < 15.5) return { h: q(9.5 + fbm(x, zz, 97)), mat: B.STONE, sub: B.STONE, cave: [4, 8.5], bio: Bio.CAVE };
+      if (x >= CAVE_X0 && x < CAVE_X1) return { h: q(9.5 + fbm(x, zz, 97)), mat: B.STONE, sub: B.STONE, cave: [4, 8.5], bio: Bio.CAVE };
       return { h: q(8.5 + 2 * fbm(x, zz, 97)), mat: B.STONE, sub: B.STONE, bio: Bio.MOUNTAIN };
     }
     if (zz < 4) {
       // 川の谷と、高台の渡河点
       if (zz < RIVER_W) {
         if (x >= 16.5) return { h: 1.0, mat: B.GRAVEL, sub: B.STONE, water: 2.5, falls: [2.5, 8], bio: Bio.FALLS };
-        const ford = x >= 12 && x < 15.5;
+        const ford = x >= CAVE_X0 && x < CAVE_X1;
         return { h: ford ? 2.0 : 1.5, mat: B.GRAVEL, sub: B.STONE, water: 2.5, bio: ford ? Bio.FORD : Bio.RIVER };
       }
       return { h: q(2.5 + 1.5 * smooth(RIVER_W, 4, zz)), mat: B.GRASS, sub: B.DIRT, bio: Bio.VALLEY };

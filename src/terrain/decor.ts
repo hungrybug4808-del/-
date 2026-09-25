@@ -1,6 +1,6 @@
 import { hash } from '../core/math';
 import { Bio } from './biomes';
-import { MAP } from './generate';
+import { MAP, RAMP, RIDGE } from './generate';
 import { CELL, NX, NZ, biome, colOf, cx, cz, level, walkY, waterDepth } from './grid';
 import { DS, Decor } from './mesh';
 
@@ -71,6 +71,9 @@ function reserved(x: number, z: number): boolean {
   if (zz >= 25 && Math.abs(x) <= 8) return true;
   if (Math.hypot(x, zz - MAP.fortZ) < 3) return true;
   if (Math.hypot(x - MAP.hill.x, z - MAP.hill.z) < 2.4) return true;
+  // 坂と峠は道なので空けておく
+  if (x >= RAMP.x0 - 0.5 && x < RAMP.x1 && zz >= RAMP.z0 - 0.5 && zz < RAMP.z1 + 0.5) return true;
+  if (x >= RIDGE.x0 - 1 && x < RIDGE.x1 + 1 && zz >= RIDGE.pass[0] - 0.5 && zz < RIDGE.pass[1] + 0.5) return true;
   return false;
 }
 
