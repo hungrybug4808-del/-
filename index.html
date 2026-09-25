@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>魔王軍略</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <h1>魔王軍略（開発版）</h1>
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="対戦フィールド"></canvas>
+    <div class="hud-top">
+      <div class="hp mine"><div class="row"><span>自軍の魔王城</span><span id="hpMineN">2500</span></div><div class="hpbar"><div class="hpfill" id="hpMine"></div></div></div>
+      <div class="hp foe"><div class="row"><span>敵軍の魔王城</span><span id="hpFoeN">2500</span></div><div class="hpbar"><div class="hpfill" id="hpFoe"></div></div></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="hud-bottom">
+      <div class="mana"><b>魔素</b><div class="cells" id="cells"></div><span id="manaN">4</span><em class="vein" id="veinN" hidden></em></div>
+      <div class="cards" id="cards"></div>
+    </div>
+    <div class="end" id="end" hidden><div class="end-box"><b id="endTitle">勝利！</b><button type="button" id="again">もう一度</button></div></div>
+  </div>
+  <p class="note">カードを選ぶと、選んだままの間は手前半分（自陣）の地面をタップするたびに同じモンスターを出せます（もう一度カードを押すと解除）。フィールドの中ほどに各陣営の砦があり、近づく敵を矢で撃ちます。砦を落とさないと魔王城には届きません。左右の竜脈は、モンスターが上にしばらくいると占領でき、占領中は魔素の回復が1か所につき50%速くなります。モンスターは自動で相手の魔王城へ進みます。サイクロプスは近接なので空のドラゴンを攻撃できず、弓兵とドラゴンはどちらも狙えます。コストと強さは仮の値です。画面をドラッグすると視点を回せます。</p>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

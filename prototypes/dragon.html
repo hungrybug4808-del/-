@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ドラゴンライダー モーション確認</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8f0f4; --panel:#ffffff; --ink:#1a2631; --sub:#566877; --line:#cfdbe4;
+  --accent:#1f7fa6; --accent-ink:#ffffff; --btn:#f1f6f9; --btn-h:#e0edf3; --stage:#cfe6f0; --chip:#d9eef7;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10161c; --panel:#18212a; --ink:#e3ebf1; --sub:#93a6b6; --line:#2a3743;
+    --accent:#56c0e6; --accent-ink:#0a1920; --btn:#1f2a34; --btn-h:#283744; --stage:#1b2733; --chip:#1c3240;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10161c; --panel:#18212a; --ink:#e3ebf1; --sub:#93a6b6; --line:#2a3743;
+  --accent:#56c0e6; --accent-ink:#0a1920; --btn:#1f2a34; --btn-h:#283744; --stage:#1b2733; --chip:#1c3240;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 32px}
+h1{font-family:"DotGothic16","Hiragino Sans",monospace;font-weight:400;font-size:clamp(28px,5vw,40px);margin:0;letter-spacing:.06em}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 16px}
+.tag{background:var(--chip);border-radius:999px;padding:2px 10px;font-size:13px}
+.layout{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:880px){.layout{grid-template-columns:minmax(0,1fr) 290px}}
+.stage{position:relative;background:var(--stage);border-radius:18px;overflow:hidden;aspect-ratio:4/3;border:1px solid var(--line)}
+@media(min-width:880px){.stage{aspect-ratio:auto;min-height:580px}}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.label{position:absolute;left:12px;top:12px;font-family:"DotGothic16",monospace;background:rgba(10,20,30,.55);color:#fff;padding:3px 10px;border-radius:8px;font-size:15px}
+.hint{position:absolute;right:12px;bottom:8px;font-size:12px;color:var(--sub)}
+.charge{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);width:min(60%,260px);opacity:0;transition:opacity .15s}
+.charge.on{opacity:1}
+.charge .t{font-family:"DotGothic16",monospace;font-size:14px;text-align:center;color:#fff;text-shadow:0 1px 2px #000}
+.bar{height:12px;background:rgba(0,0,0,.45);border-radius:6px;overflow:hidden;border:2px solid rgba(255,255,255,.85)}
+.fill{height:100%;width:0;background:linear-gradient(90deg,#ffd34d,#ff7a3d)}
+.shout{position:absolute;left:50%;top:12%;transform:translate(-50%,0) scale(.6);font-family:"DotGothic16",monospace;font-size:clamp(30px,6vw,52px);color:#fff;text-shadow:3px 3px 0 #1a2631,-2px -2px 0 #1a2631,2px -2px 0 #1a2631,-2px 2px 0 #1a2631;opacity:0;pointer-events:none;transition:opacity .12s,transform .12s;white-space:nowrap}
+.shout.on{opacity:1;transform:translate(-50%,0) scale(1)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:700}
+.moves{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+@media(min-width:880px){.moves{grid-template-columns:1fr}}
+.moves button{font:inherit;text-align:left;background:var(--btn);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:8px 12px;cursor:pointer}
+.moves button:hover{background:var(--btn-h)}
+.moves button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.moves button.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.moves b{display:block;font-size:15px}
+.moves span{font-size:12px;opacity:.85}
+.memo{margin:14px 0 0;font-size:13px;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ドラゴンライダー</h1>
+    <div class="tags"><span class="tag">空</span><span class="tag">ブレス</span><span class="tag">着陸できる</span></div>
+  </header>
+  <div class="layout">
+    <div class="stage" id="stage">
+      <canvas id="c" aria-label="ドラゴンライダーの3Dモデル"></canvas>
+      <div class="label" id="label">召喚</div>
+      <div class="shout" id="shout"></div>
+      <div class="hint">ドラッグで回転／ホイール・ピンチで拡大</div>
+    </div>
+    <aside class="panel">
+      <h2>モーション</h2>
+      <div class="moves" id="moves"></div>
+      <p class="memo">オレンジのうろこのドラゴンに、青いマントと羽飾りの騎士が鞍にまたがって乗るボクセルモデル。S字に曲がる長い首、後ろに反った黒いツノ、3本の指骨と波打つ翼膜の大きな翼、先が刃のようになった長い尻尾。騎士は手綱と槍を持ち、ドラゴンの動きに合わせて体を傾けます。空中用のボタンを地上で押すと自動で離陸し、地上用のボタンを空中で押すと自動で着陸します。</p>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const S = 0.1, SR = 0.07;
+const C = {
+  BODY:0xe0702a, BODY_D:0xb4521c, BODY_L:0xf0883c, BELLY:0xf4d9a0, BELLY_D:0xe2bf7e,
+  HORN:0x2e2a2e, HORN_T:0xe8dcc0, SPIKE:0x2e2a2e, WING:0x9c2f1c, WING_D:0x7a2214, WBONE:0xc25a20,
+  EYE:0xfff06a, TOOTH:0xf6f1e2, MOUTH:0x5a1420, NOSE:0x3a1a10,
+  SADDLE:0x6b3a1e, SADDLE_D:0x4a2612, GOLD:0xd4a93f,
+  STEEL:0x9aa4b0, STEEL_D:0x5d6670, VISOR:0x1c2230, BLUE:0x2d4a8c, BLUE_D:0x223a70, GLOVE:0x5e3b22, WOOD:0x8b5a30
+};
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function hash(x,y,z){
+  let h = Math.imul(x|0,374761393) ^ Math.imul(y|0,668265263) ^ Math.imul(z|0,1440662683);
+  h = Math.imul(h ^ (h>>>13), 1274126177); h ^= h>>>16;
+  return (h>>>0)/4294967296;
+}
+
+// ---------- scene ----------
+const canvas = document.getElementById('c'), stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xcfe6f0, 18, 40);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
+scene.add(new THREE.HemisphereLight(0xe6f6ff, 0x5b6b4a, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(4, 12, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera, {left:-9,right:9,top:9,bottom:-9,near:1,far:40});
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+function applyTheme(){
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() || '#cfe6f0';
+  scene.background = new THREE.Color(c); scene.fog.color.set(c);
+}
+applyTheme();
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+const gcv = document.createElement('canvas'); gcv.width = gcv.height = 16;
+const gx = gcv.getContext('2d');
+for(let y=0;y<16;y++) for(let x=0;x<16;x++){ const h = hash(x,y,7); gx.fillStyle = h>0.86 ? '#94c86e' : h>0.4 ? '#7bb45b' : '#6ba350'; gx.fillRect(x,y,1,1); }
+const gtex = new THREE.CanvasTexture(gcv);
+gtex.magFilter = THREE.NearestFilter; gtex.minFilter = THREE.NearestFilter;
+gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping; gtex.repeat.set(30,30);
+const dirt = new THREE.MeshLambertMaterial({color:0x7a5a3c});
+const ground = new THREE.Mesh(new THREE.BoxGeometry(30,1,30), [dirt,dirt,new THREE.MeshLambertMaterial({map:gtex}),dirt,dirt,dirt]);
+ground.position.y = -0.5; ground.receiveShadow = true; scene.add(ground);
+
+// ---------- voxel builder ----------
+const mats = [];
+class Vox{
+  constructor(){ this.m = new Map(); }
+  box(x,y,z,w,h,d,c){ for(let i=x;i<x+w;i++) for(let j=y;j<y+h;j++) for(let k=z;k<z+d;k++) this.m.set(i+','+j+','+k, c); return this; }
+  set(x,y,z,c){ this.m.set(x+','+y+','+z, c); return this; }
+  del(x,y,z){ this.m.delete(x+','+y+','+z); return this; }
+  mirror(){ const v = new Vox(); for(const [key,c] of this.m){ const [x,y,z] = key.split(',').map(Number); v.m.set((-1-x)+','+y+','+z, c); } return v; }
+  build(px,py,pz,size,basic){
+    const s = size || S;
+    const surf = [], N = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    for(const [key,c] of this.m){
+      const [x,y,z] = key.split(',').map(Number);
+      if(!N.every(([a,b,e]) => this.m.has((x+a)+','+(y+b)+','+(z+e)))) surf.push([x,y,z,c]);
+    }
+    const mat = basic ? new THREE.MeshBasicMaterial({color:0xffffff}) : new THREE.MeshLambertMaterial({color:0xffffff});
+    if(!basic) mats.push(mat);
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(s,s,s), mat, surf.length);
+    const d = new THREE.Object3D(), col = new THREE.Color();
+    surf.forEach(([x,y,z,c],i) => {
+      d.position.set((x+0.5-px)*s, (y+0.5-py)*s, (z+0.5-pz)*s); d.updateMatrix(); mesh.setMatrixAt(i, d.matrix);
+      col.setHex(typeof c === 'function' ? c(x,y,z) : c); col.offsetHSL(0, 0, (hash(x,y,z)-0.5)*(basic?0:0.07)); mesh.setColorAt(i, col);
+    });
+    mesh.castShadow = !basic; mesh.receiveShadow = !basic;
+    const g = new THREE.Group(); g.add(mesh); return g;
+  }
+}
+const scale = (x,y,z) => { const h = hash(x,y,z); return h > 0.82 ? C.BODY_D : h < 0.12 ? C.BODY_L : C.BODY; };
+const belly = z => (z & 1) ? C.BELLY : C.BELLY_D;
+
+// ===== dragon =====
+// body: broad chest, narrower waist, raised haunches
+const vBody = new Vox();
+for(let z=-7;z<=6;z++){
+  const chest = z >= 1, h = chest ? 5 : 4, y0 = chest ? -4 : -3, y1 = (chest || z <= -4) ? 3 : 2;
+  for(let x=-h;x<h;x++) for(let y=y0;y<=y1;y++){
+    if((x===-h || x===h-1) && (y===y0 || y===y1)) continue;
+    vBody.set(x,y,z, y===y0 ? belly(z) : (z===6 && y<=0 ? C.BELLY : scale(x,y,z)));
+  }
+}
+[[-6,2],[-4,2],[-2,1],[5,2]].forEach(([z,hgt]) => { for(let k=0;k<hgt;k++) vBody.box(-1,4+k,z,2,1,1,C.SPIKE); });
+vBody.box(-3,3,-1,6,1,5,C.SADDLE);
+vBody.box(-2,4,-1,4,1,1,C.SADDLE_D);
+vBody.box(-1,4,3,2,1,1,C.GOLD);
+vBody.box(-3,3,-1,6,1,1,C.GOLD);
+// neck (3 segments)
+const vN1 = new Vox(); vN1.box(-3,-2,7,6,6,4,(x,y,z)=> y===-2 ? belly(z) : scale(x,y,z)); vN1.box(-1,4,8,2,1,1,C.SPIKE); vN1.box(-1,4,10,2,1,1,C.SPIKE);
+const vN2 = new Vox(); vN2.box(-2,-2,11,4,5,4,(x,y,z)=> y===-2 ? belly(z) : scale(x,y,z)); vN2.box(-1,3,12,2,1,1,C.SPIKE); vN2.box(-1,3,14,2,1,1,C.SPIKE);
+const vN3 = new Vox(); vN3.box(-2,-1,15,4,4,3,(x,y,z)=> y===-1 ? belly(z) : scale(x,y,z)); vN3.box(-1,3,16,2,1,1,C.SPIKE);
+// head
+const vHd = new Vox();
+vHd.box(-3,-1,18,6,5,5,scale);
+vHd.box(-2,-1,23,4,3,4,scale);
+vHd.box(-2,-1,27,4,2,1,scale);
+vHd.set(-2,0,27,C.NOSE).set(1,0,27,C.NOSE);
+vHd.box(-1,2,24,2,1,1,C.HORN).box(-1,3,23,2,1,1,C.HORN_T);
+vHd.box(-4,3,20,2,1,3,C.BODY_D); vHd.box(2,3,20,2,1,3,C.BODY_D);
+vHd.del(-3,2,22).del(2,2,22);
+const hornL = [[-3,4,19],[-3,4,18],[-4,5,17],[-4,5,16],[-4,6,15],[-5,6,14],[-5,7,13],[-5,7,12]];
+hornL.forEach(([x,y,z],i) => { const c = i >= 6 ? C.HORN_T : C.HORN; vHd.set(x,y,z,c); vHd.set(-1-x,y,z,c); });
+[[-4,1,19],[-4,1,18],[-5,1,17],[-5,2,16]].forEach(([x,y,z]) => { vHd.set(x,y,z,C.SPIKE); vHd.set(-1-x,y,z,C.SPIKE); });
+vHd.set(-3,-1,25,C.TOOTH).set(-3,-2,25,C.TOOTH).set(2,-1,25,C.TOOTH).set(2,-2,25,C.TOOTH);
+const vEye = new Vox(); vEye.set(-3,2,22,C.EYE).set(2,2,22,C.EYE);
+const vJ = new Vox();
+vJ.box(-2,-3,19,4,2,8,(x,y,z)=> y===-3 ? belly(z) : ((x===-2||x===1) ? ((z&1) && z>=21 ? C.TOOTH : C.BODY) : C.MOUTH));
+vJ.box(-1,-4,20,2,1,1,C.SPIKE);
+// legs (left side, mirrored for right)
+const vFL = new Vox();
+vFL.box(-6,-5,2,3,3,4,scale); vFL.box(-6,-8,3,3,3,3,scale); vFL.box(-6,-9,3,3,1,4,C.BODY_D);
+for(let x=-6;x<=-4;x++) vFL.set(x,-9,7,C.SPIKE);
+const vBL = new Vox();
+vBL.box(-7,-5,-7,4,4,5,scale); vBL.box(-6,-8,-6,3,3,3,scale); vBL.box(-6,-9,-6,3,1,5,C.BODY_D);
+for(let x=-6;x<=-4;x++) vBL.set(x,-9,-1,C.SPIKE);
+// wings: inner arm + outer hand with three finger bones and a scalloped membrane
+function line(v, x0,z0,x1,z1, c){
+  const n = Math.max(Math.abs(x1-x0), Math.abs(z1-z0));
+  for(let i=0;i<=n;i++){ const x = Math.round(x0+(x1-x0)*i/n), z = Math.round(z0+(z1-z0)*i/n); v.set(x,0,z,c); v.set(x,1,z,c); }
+}
+function inPoly(px,pz,poly){
+  let ins = false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const [xi,zi] = poly[i], [xj,zj] = poly[j];
+    if(((zi>pz) !== (zj>pz)) && (px < (xj-xi)*(pz-zi)/(zj-zi)+xi)) ins = !ins;
+  }
+  return ins;
+}
+function scallop(px,pz,edges){
+  for(const [a,b,depth] of edges){
+    const ex = b[0]-a[0], ez = b[1]-a[1], L2 = ex*ex+ez*ez;
+    const u = ((px-a[0])*ex + (pz-a[1])*ez)/L2;
+    if(u <= 0 || u >= 1) continue;
+    const dist = Math.abs((px-a[0])*ez - (pz-a[1])*ex)/Math.sqrt(L2);
+    if(dist < depth*Math.sin(Math.PI*u)) return true;
+  }
+  return false;
+}
+const vWI = new Vox(), vWO = new Vox();
+{
+  const polyI = [[0,1],[11,1],[11,-9],[0,-10]];
+  for(let x=0;x<=10;x++) for(let z=-10;z<=0;z++){
+    const px = x+0.5, pz = z+0.5;
+    if(inPoly(px,pz,polyI) && !scallop(px,pz,[[[11,-9],[0,-10],1.3]])) vWI.set(x,0,z, hash(x,3,z) > 0.7 ? C.WING_D : C.WING);
+  }
+  line(vWI,0,0,10,0,C.WBONE); vWI.box(0,0,1,4,2,1,C.WBONE);
+  const A = [11,0], B = [9,-7], Cc = [4,-11], J = [0,-9];
+  const poly = [[0,1],A,B,Cc,J];
+  for(let x=0;x<=12;x++) for(let z=-12;z<=1;z++){
+    const px = x+0.5, pz = z+0.5;
+    if(inPoly(px,pz,poly) && !scallop(px,pz,[[A,B,2],[B,Cc,2.4],[Cc,J,2]])) vWO.set(x,0,z, hash(x,5,z) > 0.7 ? C.WING_D : C.WING);
+  }
+  line(vWO,0,0,11,0,C.WBONE); line(vWO,0,0,9,-7,C.WBONE); line(vWO,0,0,4,-11,C.WBONE);
+  vWO.set(12,0,0,C.SPIKE).set(12,1,0,C.SPIKE); vWO.set(0,2,1,C.SPIKE);
+}
+// tail (6 tapering segments, bladed tip)
+const TW = [6,6,4,4,2,2], TH = [5,4,4,3,2,2];
+const tailVox = TW.map((w,i) => {
+  const v = new Vox(), h = TH[i], y0 = -Math.floor(h/2), z0 = -7-4*(i+1);
+  v.box(-w/2,y0,z0,w,h,4,(x,y,z)=> y===y0 ? belly(z) : scale(x,y,z));
+  if(i < 5) v.box(-1,y0+h,z0+1,2,i<3?2:1,1,C.SPIKE);
+  if(i === 5){ v.box(-3,-1,z0,6,1,1,C.SPIKE); v.box(-2,-1,z0-1,4,1,1,C.SPIKE); v.box(-2,-1,z0-2,4,1,1,C.SPIKE); v.box(-1,-1,z0-3,2,1,1,C.SPIKE); }
+  return v;
+});
+
+// ===== rider =====
+const vRLeg = new Vox();
+vRLeg.box(-7,0,-1,5,2,3,C.STEEL_D); vRLeg.box(-8,-5,0,2,5,2,C.STEEL); vRLeg.box(-8,-6,0,2,1,3,C.GLOVE);
+const vRPelvis = new Vox(); vRPelvis.box(-2,0,-1,4,2,3,C.STEEL_D);
+const vRTorso = new Vox();
+vRTorso.box(-3,2,-2,6,4,4,(x,y)=> y===2 ? C.GOLD : C.STEEL);
+vRTorso.box(-1,4,2,2,1,1,C.GOLD);
+vRTorso.box(-5,5,-2,2,2,4,C.STEEL_D); vRTorso.box(3,5,-2,2,2,4,C.STEEL_D);
+vRTorso.box(-3,1,-3,6,5,1,(x,y)=> y===1 ? C.BLUE_D : C.BLUE);
+const vRHead = new Vox();
+vRHead.box(-3,6,-3,6,6,6,C.STEEL);
+vRHead.box(-2,8,2,4,1,1,C.VISOR); vRHead.box(-1,7,2,2,1,1,C.VISOR);
+vRHead.box(-1,12,-3,2,1,6,C.GOLD);
+vRHead.box(-1,13,-2,2,1,4,C.BLUE); vRHead.box(-1,10,-4,2,3,1,C.BLUE); vRHead.box(-1,12,-4,2,1,1,C.BLUE);
+const vRArmL = new Vox(); vRArmL.box(-5,2,-1,2,3,2,C.STEEL); vRArmL.box(-5,1,-1,2,1,2,C.GLOVE);
+const vRArmR = vRArmL.mirror();
+const vSpear = new Vox();
+vSpear.box(0,0,-6,1,1,22,C.WOOD);
+vSpear.box(-1,-1,1,3,3,1,C.STEEL_D);
+vSpear.box(-1,0,16,3,1,1,C.STEEL); vSpear.box(0,0,17,1,1,3,C.STEEL);
+vSpear.box(0,1,11,1,3,4,(x,y)=> y===2 ? C.GOLD : C.BLUE);
+
+// ---------- rig ----------
+const root = new THREE.Group(); scene.add(root);
+const body = vBody.build(0,0,0); root.add(body);
+const n1 = vN1.build(0,1,7);  n1.position.set(0,1*S,7*S); body.add(n1);
+const n2 = vN2.build(0,1,11); n2.position.set(0,0,4*S); n1.add(n2);
+const n3 = vN3.build(0,1,15); n3.position.set(0,0,4*S); n2.add(n3);
+const head = vHd.build(0,1,18); head.position.set(0,0,3*S); n3.add(head);
+head.add(vEye.build(0,1,18,S,true));
+const jaw = vJ.build(0,-1,19); jaw.position.set(0,-2*S,1*S); head.add(jaw);
+const mouthFx = new THREE.Object3D(); mouthFx.position.set(0,-2.5*S,9.5*S); head.add(mouthFx);
+const reinL = new THREE.Object3D(); reinL.position.set(-2.3*S,-1.8*S,6*S); head.add(reinL);
+const reinR = new THREE.Object3D(); reinR.position.set(2.3*S,-1.8*S,6*S); head.add(reinR);
+const mouthLight = new THREE.PointLight(0xff8a2a, 0, 7); mouthFx.add(mouthLight);
+const legFL = vFL.build(-4.5,-2,4);          legFL.position.set(-4.5*S,-2*S,4*S);  body.add(legFL);
+const legFR = vFL.mirror().build(4.5,-2,4);  legFR.position.set(4.5*S,-2*S,4*S);   body.add(legFR);
+const legBL = vBL.build(-5,-2,-5);           legBL.position.set(-5*S,-2*S,-5*S);  body.add(legBL);
+const legBR = vBL.mirror().build(5,-2,-5);   legBR.position.set(5*S,-2*S,-5*S);   body.add(legBR);
+function wing(sign){
+  const inner = (sign > 0 ? vWI : vWI.mirror()).build(0,0.5,0.5);
+  const outer = (sign > 0 ? vWO : vWO.mirror()).build(0,0.5,0.5);
+  inner.rotation.order = 'YZX';
+  inner.position.set(5*sign*S, 2.5*S, 3.5*S); outer.position.set(11*sign*S,0,0);
+  inner.add(outer); body.add(inner);
+  return {gi:inner, go:outer};
+}
+const wingR = wing(1), wingL = wing(-1);
+const tails = [];
+tailVox.forEach((v,i) => {
+  const g = v.build(0,0,-7-4*i);
+  if(i === 0){ g.position.set(0,0,-7*S); body.add(g); } else { g.position.set(0,0,-4*S); tails[i-1].add(g); }
+  tails.push(g);
+});
+// rider
+const rider = new THREE.Group(); rider.position.set(0,4*S,1.5*S); body.add(rider);
+rider.add(vRLeg.build(0,0,0,SR)); rider.add(vRLeg.mirror().build(0,0,0,SR)); rider.add(vRPelvis.build(0,0,0,SR));
+const rTorso = vRTorso.build(0,2,0,SR); rTorso.position.set(0,2*SR,0); rider.add(rTorso);
+const rHead = vRHead.build(0,6,0,SR); rHead.position.set(0,4*SR,0); rTorso.add(rHead);
+const rArmL = vRArmL.build(-4,5,0,SR); rArmL.position.set(-4*SR,3*SR,0); rTorso.add(rArmL);
+const rArmR = vRArmR.build(4,5,0,SR);  rArmR.position.set(4*SR,3*SR,0);  rTorso.add(rArmR);
+const rHandL = new THREE.Object3D(); rHandL.position.set(0,-3.5*SR,0); rArmL.add(rHandL);
+const spear = vSpear.build(0.5,0.5,0.5,SR); spear.position.set(0,-3.5*SR,0); rArmR.add(spear);
+// reins
+const reinGeo = new THREE.BufferGeometry(); reinGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9),3));
+const reins = new THREE.Line(reinGeo, new THREE.LineBasicMaterial({color:0x3a2412})); reins.frustumCulled = false; scene.add(reins);
+
+// ---------- effects ----------
+const D = new THREE.Object3D(), TC = new THREE.Color(), V = new THREE.Vector3();
+class Pool{
+  constructor(n, mat){
+    this.n = n; this.k = 0; this.q = [];
+    this.m = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1), mat, n);
+    this.m.frustumCulled = false; this.m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    TC.set(0xffffff);
+    for(let i=0;i<n;i++){ this.q.push({l:0}); D.position.set(0,-99,0); D.scale.setScalar(0.0001); D.updateMatrix(); this.m.setMatrixAt(i,D.matrix); this.m.setColorAt(i,TC); }
+    scene.add(this.m);
+  }
+  spawn(p, v, life, size, color, g, dr, opt){
+    const i = this.k; this.k = (this.k+1) % this.n;
+    Object.assign(this.q[i], {x:p.x,y:p.y,z:p.z,vx:v.x,vy:v.y,vz:v.z,l:life,L:life,s:size,g:g||0,dr:dr||0,gr:opt&&opt.gr||0,fl:opt&&opt.fl||false,r:Math.random()*6,rs:(Math.random()-.5)*6,dead:false});
+    TC.setHex(color); this.m.setColorAt(i,TC); this.m.instanceColor.needsUpdate = true;
+  }
+  update(dt){
+    for(let i=0;i<this.n;i++){
+      const q = this.q[i];
+      if(q.l <= 0){ if(q.dead) continue; q.dead = true; D.position.set(0,-99,0); D.rotation.set(0,0,0); D.scale.setScalar(0.0001); }
+      else {
+        q.l -= dt; q.vy -= q.g*dt;
+        if(q.dr){ const m = Math.exp(-q.dr*dt); q.vx *= m; q.vz *= m; q.vy *= Math.exp(-q.dr*0.5*dt); }
+        q.x += q.vx*dt; q.y += q.vy*dt; q.z += q.vz*dt;
+        if(q.fl && q.y < 0.12){ q.y = 0.12; q.vy = Math.abs(q.vy)*0.15 + 0.6; q.vx *= 1.1; q.vz *= 1.1; }
+        else if(q.g > 0 && q.y < q.s*0.5){ q.y = q.s*0.5; q.vy *= -0.25; q.vx *= 0.6; q.vz *= 0.6; }
+        q.r += q.rs*dt;
+        const f = Math.max(q.l/q.L,0);
+        const sc = q.gr ? q.s*(0.35 + q.gr*(1-f))*Math.min(1, f*4) : q.s*Math.sqrt(f);
+        D.position.set(q.x,q.y,q.z); D.rotation.set(q.r,q.r*0.7,0); D.scale.setScalar(sc+0.0001);
+      }
+      D.updateMatrix(); this.m.setMatrixAt(i,D.matrix);
+    }
+    this.m.instanceMatrix.needsUpdate = true;
+  }
+}
+const solid = new Pool(800, new THREE.MeshLambertMaterial({color:0xffffff}));
+const glow = new Pool(1000, new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+const rnd = (a,b) => a + Math.random()*(b-a);
+const vec = (x,y,z) => ({x,y,z});
+function dust(p, n, spread, size){
+  const cols = [0xd9cdb5,0xc7b797,0xb3a283], k = size || 1;
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, s = rnd(0.5,(spread||1)*1.8);
+    solid.spawn(vec(p.x+rnd(-.3,.3), 0.1, p.z+rnd(-.3,.3)), vec(Math.cos(a)*s, rnd(0.2,0.7), Math.sin(a)*s), rnd(0.9,1.5), rnd(0.12,0.26)*k, cols[i%3], 0.15, 2.2);
+  }
+}
+const rings = [];
+function ring(p, color, max, dur){
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.85,1,48), new THREE.MeshBasicMaterial({color, transparent:true, depthWrite:false, side:THREE.DoubleSide}));
+  m.rotation.x = -Math.PI/2; m.position.set(p.x,0.03,p.z); scene.add(m); rings.push({m,t:0,dur,max});
+}
+function magicMat(color){ return new THREE.MeshBasicMaterial({color, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide}); }
+const cmA = magicMat(0x6fe3ff), cmB = magicMat(0xa98bff), cmP = magicMat(0x6fe3ff);
+const circle = new THREE.Group();
+circle.add(new THREE.Mesh(new THREE.RingGeometry(2.4,2.6,64), cmA));
+const hexA = new THREE.Mesh(new THREE.RingGeometry(1.7,1.82,6), cmB); circle.add(hexA);
+const hexB = new THREE.Mesh(new THREE.RingGeometry(1.7,1.82,6), cmB); hexB.rotation.z = Math.PI/6; circle.add(hexB);
+circle.rotation.x = -Math.PI/2; circle.position.y = 0.02; circle.visible = false; scene.add(circle);
+// sky portal the dragon flies out of
+const PORTAL = new THREE.Vector3(0, 8.5, -12);
+const portal = new THREE.Group();
+portal.add(new THREE.Mesh(new THREE.RingGeometry(3.2,3.5,64), cmA));
+const pHex = new THREE.Mesh(new THREE.RingGeometry(2.4,2.55,6), cmB); portal.add(pHex);
+portal.add(new THREE.Mesh(new THREE.CircleGeometry(3.2,64), cmP));
+portal.position.copy(PORTAL); portal.visible = false; scene.add(portal);
+
+const FIRE = [0xfff3b0,0xffd060,0xffa030,0xff6a1a,0xff4a12];
+const FQ = new THREE.Quaternion(), FD = new THREE.Vector3(), FP = new THREE.Vector3();
+let ringT = 0;
+function breathe(dt, power){
+  mouthFx.getWorldPosition(FP); mouthFx.getWorldQuaternion(FQ);
+  FD.set(0,0,1).applyQuaternion(FQ);
+  const n = Math.round(10*power);
+  for(let i=0;i<n;i++){
+    const sp = rnd(6.5,9), jx = rnd(-.12,.12), jy = rnd(-.12,.12), jz = rnd(-.12,.12);
+    glow.spawn(vec(FP.x,FP.y,FP.z), vec((FD.x+jx)*sp, (FD.y+jy)*sp, (FD.z+jz)*sp), rnd(0.45,0.65), rnd(0.13,0.2), FIRE[(Math.random()*FIRE.length)|0], -1.5, 0.6, {gr:2.2, fl:true});
+  }
+  if(FD.y < -0.05){
+    const L = -FP.y/FD.y;
+    if(L < 14){
+      const hx = FP.x + FD.x*L, hz = FP.z + FD.z*L;
+      if(Math.random() < 0.7) solid.spawn(vec(hx+rnd(-.3,.3), 0.2, hz+rnd(-.3,.3)), vec(rnd(-.2,.2), rnd(0.6,1.2), rnd(-.2,.2)), rnd(1.2,1.8), rnd(0.18,0.28), Math.random()<.5?0x57504a:0x6e665e, -0.3, 0.8, {gr:1.6});
+      for(let i=0;i<2;i++) glow.spawn(vec(hx, 0.15, hz), vec(rnd(-2,2), rnd(1.5,3.5), rnd(-2,2)), rnd(0.4,0.8), rnd(0.04,0.07), Math.random()<.5?0xffc14a:0xff6a1a, 5);
+      ringT -= dt; if(ringT <= 0){ ring({x:hx,z:hz}, 0xff8a2a, 1.8, 0.35); ringT = 0.14; }
+    }
+  }
+}
+
+// ---------- UI ----------
+const labelEl = document.getElementById('label'), shoutEl = document.getElementById('shout');
+let shoutTimer = 0;
+function shout(text, dur){ shoutEl.textContent = text; shoutEl.classList.add('on'); shoutTimer = dur; }
+
+// ---------- pose ----------
+const cl = (v,a=0,b=1) => Math.min(b, Math.max(a, v));
+const seg = (t,a,b) => cl((t-a)/(b-a));
+const lerp = (a,b,x) => a + (b-a)*x;
+const ease = x => x*x*(3-2*x), eIn = x => x*x, eOut = x => 1-(1-x)*(1-x);
+const easeIO = x => x<0.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2;
+function kf(keys, t){
+  if(t <= keys[0][0]) return keys[0][1];
+  for(let i=1;i<keys.length;i++){
+    if(t <= keys[i][0]){ const [t0,v0] = keys[i-1], [t1,v1,e] = keys[i]; return v0 + (v1-v0)*(e||easeIO)((t-t0)/(t1-t0)); }
+  }
+  return keys[keys.length-1][1];
+}
+const RIDER_G = {rLean:0.08, rTwist:0, rHeadX:0, rHeadY:0, rArmL:-0.9, rArmR:-0.35, rSpear:-1.2};
+function groundPose(T){
+  return Object.assign(T, {rootX:0,rootY:0.9,rootZ:0,rootRX:0,rootRY:0,rootRZ:0,rootS:1,
+    n1:-0.55,n2:-0.25,n3:0.3,headRX:0.5,neckRY:0,headRY:0,jaw:0, legF:0,legB:0,
+    wingRoll:-1.45,wingY:1.35,wingBase:0.25,wingOut:-2.7, flapA:0,flapF:0, tailRX:-0.1,tailRY:0,tailA:0.1,tailF:1.1}, RIDER_G);
+}
+function airPose(T){
+  return Object.assign(T, {rootX:0,rootY:2.6,rootZ:0,rootRX:-0.1,rootRY:0,rootRZ:0,rootS:1,
+    n1:-0.28,n2:-0.1,n3:0.15,headRX:0.25,neckRY:0,headRY:0,jaw:0, legF:1.0,legB:1.15,
+    wingRoll:0,wingY:0,wingBase:0.15,wingOut:0, flapA:0.72,flapF:5.8, tailRX:0.04,tailRY:0,tailA:0.15,tailF:1.8}, RIDER_G, {rLean:0.15, rArmL:-1.0});
+}
+function mixPose(T, w){ const A = airPose({}), G = groundPose({}); for(const k in A) T[k] = lerp(G[k], A[k], w); return T; }
+let P = groundPose({}), shake = 0;
+const st = {name:'gidle', t:0, fired:{}, rate:10, glow:[0,0,0], next:null, snap:false, air:false, fp:0, tp:0, prevCf:0, light:0, defAir:false, cam:null};
+function statePose(T){ return st.air ? airPose(T) : groundPose(T); }
+function once(k, cond, fn){ if(cond && !st.fired[k]){ st.fired[k] = true; fn(); } }
+function addShake(a){ if(!reduceMotion) shake = Math.max(shake, a); }
+function wp(o){ o.getWorldPosition(V); return {x:V.x, y:V.y, z:V.z}; }
+
+// ---------- motions ----------
+const M = {
+  summon:{label:'召喚', desc:'空の魔法陣から現れ、滑空して着地し咆哮', dur:5.2, need:'any', after:false, fn(T,t,dt){
+    st.rate = 10; groundPose(T);
+    const K = keys => kf(keys, t);
+    st.cam = t < 3.0 ? {y:3.6, z:-4, d:17} : null;
+    // portal in the sky, landing circle on the ground
+    const po = K([[0,0],[0.3,1],[1.4,1],[2.0,0]]);
+    portal.visible = po > 0.01; portal.rotation.z += dt*0.8; pHex.rotation.z -= dt*1.4;
+    const co = K([[0,0],[0.5,0.9],[2.9,0.9],[3.5,0]]);
+    circle.visible = co > 0.01; cmA.opacity = Math.max(po, co)*0.9; cmB.opacity = Math.max(po, co)*0.7; cmP.opacity = po*0.25;
+    circle.rotation.z += dt*1.2; hexA.rotation.z -= dt*1.6;
+    // flight path: out of the portal, dive, flare, land
+    T.rootZ = K([[0,PORTAL.z],[0.35,PORTAL.z+0.5],[2.2,-2.2],[2.9,0,eOut]]);
+    T.rootY = K([[0,PORTAL.y],[0.35,PORTAL.y-0.1],[2.2,2.5],[2.9,0.9,eOut],[3.02,0.72,eOut],[3.35,0.9]]);
+    T.rootS = K([[0,0.2],[0.6,1,eOut]]);
+    T.rootRX = K([[0,0.2],[0.4,0.4],[2.0,0.3],[2.5,-0.55],[2.9,-0.2],[3.05,0.08],[3.4,0],[3.7,0],[4.0,-0.3],[4.5,-0.3],[5.0,0]]);
+    T.wingRoll = K([[0,0],[4.5,0],[5.1,-1.45]]);
+    T.wingY = K([[0,0.35],[2.1,0.35],[2.4,0],[3.3,0.25],[3.9,0],[4.5,0],[5.1,1.35]]);
+    T.wingBase = K([[0,0.05],[2.1,0.05],[2.4,0.45],[3.3,0.3],[3.9,0.6],[4.5,0.6],[5.1,0.25]]);
+    T.wingOut = K([[0,-0.1],[4.5,0],[5.1,-2.7]]);
+    T.flapA = K([[0,0.1],[2.1,0.12],[2.3,1.1],[2.85,1.1],[3.1,0.2],[3.4,0]]);
+    T.flapF = K([[0,2],[2.1,2],[2.25,9],[2.9,9],[3.2,2]]);
+    T.legF = K([[0,1.1],[2.2,1.1],[2.7,-0.3],[2.9,0],[3.9,0],[4.05,-0.6],[4.5,-0.6],[4.9,0]]);
+    T.legB = K([[0,1.2],[2.2,1.2],[2.7,0.1],[2.9,0]]);
+    T.n1 = K([[0,-0.1],[2.2,-0.05],[2.6,-0.4],[3.0,-0.55],[3.9,-0.55],[4.1,-0.95],[4.5,-0.95],[5.0,-0.55]]);
+    T.n2 = K([[0,0],[2.6,-0.2],[3.0,-0.25],[3.9,-0.25],[4.1,-0.35],[4.5,-0.35],[5.0,-0.25]]);
+    T.n3 = K([[0,0.1],[3.0,0.3],[3.9,0.3],[4.1,-0.1],[4.5,-0.1],[5.0,0.3]]);
+    T.headRX = K([[0,-0.15],[2.6,0.2],[3.0,0.5],[3.9,0.5],[4.1,0.0],[4.5,0.0],[5.0,0.5]]);
+    T.jaw = K([[0,0],[4.05,0],[4.15,0.75],[4.5,0.75],[4.7,0]]);
+    T.tailRX = K([[0,0.12],[2.2,0.12],[3.0,-0.1]]);
+    T.rLean = K([[0,0.35],[2.2,0.35],[2.5,-0.2],[2.9,0.3],[3.2,0.08]]);
+    T.rArmR = K([[0,-0.35],[3.9,-0.35],[4.1,-2.8],[4.6,-2.8],[5.0,-0.35]]);
+    T.rSpear = K([[0,-1.2],[3.9,-1.2],[4.1,0.3],[4.6,0.3],[5.0,-1.2]]);
+    T.rHeadX = K([[0,0],[3.9,0],[4.1,-0.3],[4.6,-0.3],[5.0,0]]);
+    const g = 1-seg(t,0.3,1.6);
+    st.glow = [0.15*g, 0.6*g, 0.8*g];
+    if(t > 0.2 && t < 1.8){
+      const p = wp(body);
+      for(let i=0;i<5;i++) glow.spawn(vec(p.x+rnd(-1.6,1.6), p.y+rnd(-.4,.6), p.z+rnd(-2,2)), vec(rnd(-.3,.3), rnd(-.2,.4), rnd(-1.5,-0.5)), rnd(0.4,0.8), rnd(0.05,0.1), Math.random()<.5?0x6fe3ff:0xa98bff, 0);
+    }
+    once('touch', t>=2.9, ()=>{ addShake(0.45); ring({x:0,z:0}, 0xd9cdb5, 4, 0.7); dust({x:0,z:0.3}, 40, 1.8); });
+    once('roar', t>=4.15, ()=>{ shout('ギャオォォ！', 1.0); ring({x:0,z:1}, 0xffffff, 5, 0.6); addShake(0.3); dust({x:0,z:1}, 24, 1.6); });
+    if(t > 4.15 && t < 4.6) addShake(0.07);
+  }},
+  hover:{label:'空中待機', desc:'羽ばたきながら空中にとどまる', loop:true, need:'air', fn(T,t){
+    st.rate = 6; airPose(T);
+    T.rootRZ = 0.04*Math.sin(t*1.3); T.rootY += 0.1*Math.sin(t*0.9);
+    T.neckRY = 0.3*Math.sin(t*0.5); T.headRY = 0.15*Math.sin(t*0.5);
+    T.rHeadY = 0.3*Math.sin(t*0.4+1);
+  }},
+  fly:{label:'飛行', desc:'体を水平にして前へ飛ぶ', loop:true, need:'air', fn(T,t,dt){
+    st.rate = 5; airPose(T);
+    Object.assign(T, {rootY:2.9, rootRX:0.18, flapF:7, flapA:0.95, n1:-0.08, n2:0, n3:0.05, headRX:-0.15, legF:1.4, legB:1.45, tailRX:0.1, tailA:0.08, tailF:2.4,
+      rLean:0.45, rArmR:-0.7, rSpear:-0.1});
+    T.rootRZ = 0.1*Math.sin(t*1.1); T.rootRY = 0.06*Math.sin(t*1.1);
+    gtex.offset.y -= dt*4;
+  }},
+  breath:{label:'ブレス', desc:'息を吸い込み、炎を吐いてなぎ払う', dur:3.9, need:'any', fn(T,t,dt){
+    st.rate = 12; statePose(T);
+    const K = keys => kf(keys, t);
+    const back = K([[0,0],[0.9,1],[1.15,0,eOut]]), strike = K([[0,0],[0.9,0],[1.15,1,eOut],[3.0,1],[3.7,0]]);
+    T.n1 += -0.3*back + 0.35*strike; T.n2 += -0.3*back + 0.3*strike; T.n3 += -0.2*back + 0.2*strike; T.headRX += -0.2*back + 0.4*strike;
+    if(st.air) T.rootRX += -0.25*back + 0.05*strike;
+    else { T.legF = -0.25*back; T.rootRX = -0.1*back + 0.04*strike; }
+    T.neckRY = K([[0,0],[1.2,0],[1.55,-0.5],[2.5,0.5],[3.0,0],[3.7,0]]);
+    T.headRY = 0.3*T.neckRY;
+    T.jaw = K([[0,0],[0.9,0.15],[1.1,0.8,eOut],[3.0,0.8],[3.3,0]]);
+    T.rArmR = K([[0,-0.35],[0.5,-1.5],[3.2,-1.5],[3.7,-0.35]]);
+    T.rSpear = K([[0,-1.2],[0.5,0.1],[3.2,0.1],[3.7,-1.2]]);
+    T.rLean += 0.15*strike;
+    const inhale = seg(t,0,0.95)*(1-seg(t,1.1,1.3));
+    st.glow = [0.35*inhale, 0.12*inhale, 0];
+    const firing = t >= 1.15 && t < 3.0;
+    st.light = firing ? 3 : inhale*1.5;
+    if(t < 0.95 && Math.random() < 0.9){
+      const e = wp(mouthFx), a = Math.random()*Math.PI*2, b = rnd(-0.8,0.8), r = rnd(1,1.6);
+      const o = {x:Math.cos(a)*r, y:b, z:Math.sin(a)*r};
+      glow.spawn(vec(e.x+o.x, e.y+o.y, e.z+o.z), vec(-o.x*1.6, -o.y*1.6, -o.z*1.6), 0.6, rnd(0.05,0.08), Math.random()<.5?0xffa030:0xfff3b0, 0);
+    }
+    once('fire', t>=1.15, ()=>{ shout('ゴオォォ！', 0.9); addShake(0.2); });
+    if(firing){ addShake(0.07); breathe(dt, seg(t,1.15,1.3)*(1-seg(t,2.85,3.0))); }
+  }},
+  land:{label:'着陸', desc:'羽ばたいて減速し、地面に降りて翼をたたむ', dur:2.7, need:'air', after:false, fn(T,t){
+    st.rate = 10;
+    const K = keys => kf(keys, t);
+    mixPose(T, K([[0,1],[1.5,1],[2.6,0]]));
+    T.rootY = K([[0,2.6],[1.5,0.9],[1.62,0.72,eOut],[1.95,0.9]]);
+    T.rootRX = K([[0,-0.1],[0.9,-0.45],[1.5,-0.1],[1.62,0.08],[2.0,0]]);
+    T.legF = K([[0,1.0],[1.0,-0.25],[1.5,0],[2.6,0]]);
+    T.legB = K([[0,1.15],[1.0,0.1],[1.5,0]]);
+    T.flapA = K([[0,0.72],[0.3,1.05],[1.4,1.05],[1.55,0.3],[2.2,0]]);
+    T.flapF = K([[0,5.8],[0.3,9],[1.45,9],[2.0,3]]);
+    T.rLean = K([[0,0.15],[0.9,-0.15],[1.5,0.05],[1.62,0.35],[2.0,0.08]]);
+    once('touch', t>=1.5, ()=>{ addShake(0.4); ring({x:0,z:0}, 0xd9cdb5, 3.5, 0.6); dust({x:0,z:0.3}, 34, 1.7); });
+  }},
+  gidle:{label:'地上待機', desc:'翼をたたみ、地面で周りを見る', loop:true, need:'ground', fn(T,t){
+    st.rate = 5; groundPose(T);
+    const b = Math.sin(t*1.5);
+    T.rootY += 0.015*b; T.n1 += 0.03*b; T.rLean += 0.02*b;
+    T.neckRY = [0,0.4,0,-0.4][Math.floor(t/2.4)%4]; T.headRY = 0.35*T.neckRY;
+    T.rHeadY = 0.5*T.neckRY;
+    T.jaw = (t % 6) > 5.6 ? 0.3 : 0;
+  }},
+  takeoff:{label:'離陸', desc:'翼を広げて身をかがめ、空へ舞い上がる', dur:2.4, need:'ground', after:true, fn(T,t){
+    st.rate = 10;
+    const K = keys => kf(keys, t);
+    mixPose(T, K([[0,0],[0.5,0.7],[0.7,1],[2.4,1]]));
+    T.rootY = K([[0,0.9],[0.5,0.7],[0.8,1.4,eOut],[2.3,2.6]]);
+    T.rootRX = K([[0,0],[0.5,0.12],[0.8,-0.38],[2.3,-0.1]]);
+    T.legF = K([[0,0],[0.5,-0.2],[0.9,0.5],[2.0,1.0]]);
+    T.legB = K([[0,0],[0.5,0.25],[0.8,-0.35],[2.0,1.15]]);
+    T.flapA = K([[0,0],[0.5,0.4],[0.7,1.1],[1.9,1.05],[2.4,0.72]]);
+    T.flapF = K([[0,3],[0.6,9],[1.9,9],[2.4,5.8]]);
+    T.rLean = K([[0,0.08],[0.5,0.4],[0.8,0.45],[2.3,0.15]]);
+    once('leap', t>=0.62, ()=>{ addShake(0.25); dust({x:0,z:0}, 28, 1.5); });
+  }},
+  hit:{label:'被弾', desc:'のけぞり、翼がびくっと跳ねる', dur:1.0, need:'any', fn(T,t){
+    st.rate = 16; statePose(T);
+    const k = t < 0.1 ? eOut(t/0.1) : 1-easeIO(seg(t,0.1,1.0));
+    T.rootZ = -0.3*k; T.rootRX += -0.25*k; T.n1 += -0.35*k; T.n2 += -0.2*k; T.headRX += -0.3*k; T.jaw = 0.5*k;
+    T.wingBase += 0.4*k; if(st.air) T.rootY -= 0.2*k;
+    T.rLean += -0.45*k; T.rArmR += -0.6*k;
+    const f = 1-seg(t,0,0.45); st.glow = [0.8*f, 0.1*f, 0.1*f];
+    once('s', true, ()=>{ addShake(0.12); const p = wp(body); for(let i=0;i<14;i++) glow.spawn(vec(p.x,p.y+0.2,p.z+0.6), vec(rnd(-2,2),rnd(0.5,2.5),rnd(0.5,2.5)), 0.35, 0.07, 0xfff2b0, 3); });
+  }},
+  defeat:{label:'撃破', desc:'墜落して倒れ、魔素の粒になって消える', dur:4.3, need:'any', after:false, fn(T,t){
+    st.rate = 12;
+    once('init', true, ()=>{ st.defAir = st.air; });
+    const K = keys => kf(keys, t);
+    let crash;
+    if(st.defAir){
+      mixPose(T, K([[0,1],[1.5,0.3]]));
+      T.rootY = K([[0,2.6],[0.4,2.8],[1.5,0.7,eIn]]);
+      T.rootRZ = K([[0,0],[0.4,-0.2],[1.5,1.2,eIn],[1.7,1.1],[1.9,1.15]]);
+      T.rootRX = K([[0,-0.1],[0.4,-0.4],[1.5,0.15]]);
+      T.flapA = K([[0,0.72],[0.4,1.2],[0.8,0.2],[1.5,0]]); T.flapF = 8;
+      T.wingRoll = 0; T.wingY = 0.2; T.wingBase = K([[0,0.15],[1.5,-0.3]]); T.wingOut = K([[0,0],[1.5,-0.4]]);
+      crash = 1.5;
+    } else {
+      groundPose(T);
+      T.rootY = K([[0,0.9],[0.5,1.0],[1.4,0.7,eIn]]);
+      T.rootRZ = K([[0,0],[0.5,-0.15],[1.4,1.15,eIn],[1.6,1.05],[1.8,1.1]]);
+      T.wingRoll = K([[0,-1.45],[0.5,0]]); T.wingY = K([[0,1.35],[0.5,0.3]]); T.wingOut = K([[0,-2.7],[0.5,-0.3]]);
+      crash = 1.4;
+    }
+    T.n1 = K([[0,T.n1],[0.4,-0.8],[crash,-0.1],[crash+0.3,0.2]]);
+    T.n2 = K([[0,T.n2],[0.4,-0.4],[crash,0.1]]);
+    T.headRX = K([[0,T.headRX],[crash,0.2]]);
+    T.jaw = K([[0,0],[0.4,0.7],[crash+0.3,0.3]]);
+    T.legF = K([[0,T.legF],[crash,0.3]]); T.legB = K([[0,T.legB],[crash,0.3]]);
+    T.tailA = 0.03;
+    T.rLean = K([[0,0.1],[0.4,-0.5],[crash,0.4]]); T.rArmR = K([[0,-0.35],[0.4,-2.2],[crash,-0.8]]); T.rArmL = K([[0,-0.9],[0.4,-2.0],[crash,-0.6]]);
+    const c = seg(t,2.3,3.5);
+    T.rootS = 1-eIn(c);
+    const f = 1-seg(t,0,0.4);
+    st.glow = [0.8*f + 0.1*c, 0.1*f + 0.45*c, 0.1*f + 0.6*c];
+    once('crash', t>=crash, ()=>{ addShake(0.5); const p = wp(body); ring({x:p.x,z:p.z}, 0xd9cdb5, 4, 0.7); dust({x:p.x,z:p.z}, 40, 1.9); });
+    if(c > 0 && c < 1){ const p = wp(body); for(let i=0;i<7;i++) glow.spawn(vec(p.x+rnd(-1.4,1.4), p.y+rnd(-.4,.7), p.z+rnd(-2,2)), vec(rnd(-.2,.2), rnd(0.8,1.8), rnd(-.2,.2)), rnd(0.7,1.2), rnd(0.05,0.1), Math.random()<.5?0x6fe3ff:0xa98bff, -0.8); }
+    root.visible = t < 3.55;
+  }}
+};
+const ORDER = ['summon','hover','fly','breath','land','gidle','takeoff','hit','defeat'];
+const movesEl = document.getElementById('moves'), btns = {};
+ORDER.forEach(k => {
+  const b = document.createElement('button'); b.type = 'button';
+  b.innerHTML = '<b>'+M[k].label+'</b><span>'+M[k].desc+'</span>';
+  b.addEventListener('click', () => play(k)); movesEl.appendChild(b); btns[k] = b;
+});
+function play(name){
+  if(!root.visible && name !== 'summon'){ play('summon'); st.next = (name === 'defeat') ? null : name; return; }
+  const need = M[name].need;
+  if(st.name === 'takeoff' && need === 'air' && name !== 'takeoff' && root.visible){ st.next = name; return; }
+  if(st.name === 'land' && need === 'ground' && name !== 'land' && root.visible){ st.next = name; return; }
+  if(need === 'air' && !st.air && name !== 'takeoff'){ play('takeoff'); st.next = name; return; }
+  if(need === 'ground' && st.air && name !== 'land'){ play('land'); st.next = name; return; }
+  st.name = name; st.t = 0; st.fired = {}; st.glow = [0,0,0]; st.cam = null;
+  if(name === 'summon'){ st.snap = true; root.visible = true; st.air = false; } else st.next = null;
+  circle.visible = portal.visible = false;
+  labelEl.textContent = M[name].label;
+  ORDER.forEach(k => btns[k].classList.toggle('active', k === name));
+}
+
+// ---------- camera ----------
+let yaw = 0.75, pitch = 0.2, dist = 11;
+const camBase = new THREE.Vector3(0, 1.5, 0.5), camTarget = camBase.clone();
+let camD = 0;
+const ptrs = new Map(); let pinch = 0;
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); });
+canvas.addEventListener('pointermove', e => {
+  if(!ptrs.has(e.pointerId)) return;
+  const prev = ptrs.get(e.pointerId), dx = e.clientX-prev.x, dy = e.clientY-prev.y;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size === 1){ yaw -= dx*0.008; pitch = cl(pitch+dy*0.006, 0.03, 1.25); }
+  else if(ptrs.size === 2){ const [a,b] = [...ptrs.values()], d = Math.hypot(a.x-b.x,a.y-b.y); if(pinch) dist = cl(dist*pinch/d, 4, 24); pinch = d; }
+});
+const endPtr = e => { ptrs.delete(e.pointerId); if(ptrs.size < 2) pinch = 0; };
+canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('wheel', e => { e.preventDefault(); dist = cl(dist*(1+e.deltaY*0.001), 4, 24); }, {passive:false});
+function resize(){ const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w,h,false); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage); resize();
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+const RV = new THREE.Vector3();
+play('summon');
+function frame(){
+  const dt = Math.min(clock.getDelta(), 0.05);
+  st.t += dt;
+  const mo = M[st.name], T = groundPose({});
+  st.glow = [0,0,0]; st.light = 0;
+  mo.fn(T, st.t, dt);
+  if(st.snap){ P = Object.assign({}, T); st.snap = false; }
+  const k = 1-Math.exp(-st.rate*dt);
+  for(const key in T) P[key] += (T[key]-P[key])*k;
+
+  st.fp += dt*P.flapF; st.tp += dt*P.tailF;
+  const sf = Math.sin(st.fp), cf = Math.cos(st.fp);
+  root.position.set(P.rootX, P.rootY - 0.1*P.flapA*sf, P.rootZ);
+  root.rotation.set(P.rootRX, P.rootRY, P.rootRZ);
+  root.scale.setScalar(Math.max(P.rootS, 0.0001));
+  const ny = P.neckRY/3;
+  n1.rotation.set(P.n1, ny, 0); n2.rotation.set(P.n2, ny, 0); n3.rotation.set(P.n3, ny, 0);
+  head.rotation.set(P.headRX, P.headRY, 0);
+  jaw.rotation.x = P.jaw;
+  legFL.rotation.x = legFR.rotation.x = P.legF;
+  legBL.rotation.x = legBR.rotation.x = P.legB;
+  const wz = P.wingBase + P.flapA*sf, wo = P.wingOut + P.flapA*0.55*Math.sin(st.fp-0.7);
+  wingR.gi.rotation.set(P.wingRoll, P.wingY, wz);   wingR.go.rotation.set(0, 0, wo);
+  wingL.gi.rotation.set(P.wingRoll, -P.wingY, -wz); wingL.go.rotation.set(0, 0, -wo);
+  tails.forEach((s,i) => s.rotation.set(P.tailRX, P.tailRY + P.tailA*Math.sin(st.tp - i*0.7), 0));
+  // rider balances against the dragon's pitch and wingbeats
+  rTorso.rotation.set(P.rLean - 0.5*P.rootRX + 0.04*P.flapA*sf, P.rTwist, -0.4*P.rootRZ);
+  rHead.rotation.set(P.rHeadX, P.rHeadY, 0);
+  rArmL.rotation.x = P.rArmL; rArmR.rotation.x = P.rArmR; spear.rotation.x = P.rSpear;
+  mats.forEach(m => m.emissive.setRGB(st.glow[0], st.glow[1], st.glow[2]));
+  mouthLight.intensity = st.light;
+  root.updateMatrixWorld(true);
+
+  // reins: bit → hand → bit
+  reins.visible = root.visible && P.rootS > 0.5;
+  const pa = reinGeo.attributes.position;
+  reinL.getWorldPosition(RV); pa.setXYZ(0, RV.x, RV.y, RV.z);
+  rHandL.getWorldPosition(RV); pa.setXYZ(1, RV.x, RV.y, RV.z);
+  reinR.getWorldPosition(RV); pa.setXYZ(2, RV.x, RV.y, RV.z);
+  pa.needsUpdate = true;
+
+  // wing wash kicks up dust near the ground
+  if(st.prevCf < 0 && cf >= 0 && P.rootY < 2.3 && P.flapA > 0.5 && root.visible){
+    const s = cl((2.5-P.rootY)/1.7), n = Math.round(18*s);
+    if(n > 0){ dust({x:P.rootX, z:P.rootZ}, n, 1.9); ring({x:P.rootX, z:P.rootZ}, 0xd9cdb5, 2.8*s+0.5, 0.5); addShake(0.05*s); }
+  }
+  st.prevCf = cf;
+
+  if(!mo.loop && st.t >= mo.dur){
+    if(mo.after !== undefined) st.air = mo.after;
+    if(st.name === 'defeat') play('summon');
+    else { const n = st.next || (st.air ? 'hover' : 'gidle'); st.next = null; play(n); }
+  }
+
+  solid.update(dt); glow.update(dt);
+  for(let i=rings.length-1;i>=0;i--){
+    const r = rings[i]; r.t += dt; const q = r.t/r.dur;
+    r.m.scale.setScalar(0.3+q*r.max); r.m.material.opacity = Math.max(0,1-q);
+    if(q >= 1){ scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); rings.splice(i,1); }
+  }
+  if(shoutTimer > 0){ shoutTimer -= dt; if(shoutTimer <= 0) shoutEl.classList.remove('on'); }
+
+  // camera (pulls back while the dragon arrives)
+  const ck = 1-Math.exp(-2.5*dt);
+  const wantY = st.cam ? st.cam.y : camBase.y, wantZ = st.cam ? st.cam.z : camBase.z, wantD = st.cam ? st.cam.d - 11 : 0;
+  camTarget.y += (wantY - camTarget.y)*ck; camTarget.z += (wantZ - camTarget.z)*ck; camD += (wantD - camD)*ck;
+  shake *= Math.exp(-dt*6);
+  const cp = Math.cos(pitch), dd = dist + camD;
+  camera.position.set(
+    camTarget.x + Math.sin(yaw)*cp*dd + (Math.random()-.5)*shake*0.4,
+    camTarget.y + Math.sin(pitch)*dd + (Math.random()-.5)*shake*0.4,
+    camTarget.z + Math.cos(yaw)*cp*dd
+  );
+  camera.lookAt(camTarget);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
