@@ -6,10 +6,13 @@ import { restartBattle, stepBattle } from './battle/battle';
 import { updateEffects } from './fx/effects';
 import { onRestart, updateHud } from './ui/hud';
 import { updateCamera } from './input/controls';
+import { resetBuddy, updateBuddy } from './buddy/buddy';
+import { showSelect, updateBuddyUI } from './ui/buddyUI';
 
 buildTerrain();
 buildSky();
-onRestart(restartBattle);
+// 「もう一度」でバディを選び直す
+onRestart(() => { restartBattle(); resetBuddy(); showSelect(); });
 
 let last = performance.now(), time = 0;
 function frame(now: number): void {
@@ -20,7 +23,9 @@ function frame(now: number): void {
   updateTerrain(dt, time);
   updateSky(dt, time);
   updateEffects(dt);
+  updateBuddy(dt);
   updateHud(dt);
+  updateBuddyUI();
   updateCamera(dt, time);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

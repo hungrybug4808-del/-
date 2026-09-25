@@ -4,6 +4,7 @@ import { MANA_MAX, player } from '../battle/battle';
 import { ownedVeins, VEIN_BONUS } from '../battle/veins';
 import { game, notify } from '../battle/world';
 import { flagMode } from '../battle/flags';
+import { buddy } from '../buddy/buddy';
 import { DEF, HAND } from '../units/registry';
 import type { UnitType } from '../units/types';
 
@@ -35,7 +36,7 @@ for (const k of HAND) {
   b.innerHTML = `<span class="ic">${d.icon}</span><span><b>${d.name}</b><small>${d.sub}</small></span><span class="cost">${d.cost}</span>`;
   b.addEventListener('click', () => {
     hand.selected = hand.selected === k ? null : k;
-    if (hand.selected) setFlagMode(false);
+    if (hand.selected) { setFlagMode(false); buddy.targeting = false; }
   });
   cardsEl.appendChild(b);
   cardBtns[k] = b;
@@ -48,6 +49,7 @@ export function setFlagMode(on: boolean): void {
   if (!on) flagMode.selected.clear();
   else {
     hand.selected = null;
+    buddy.targeting = false;
     toast('動かすモンスターをタップ → 地面をタップで旗。旗をタップで外す', 3);
   }
 }

@@ -7,7 +7,9 @@ import { TEAM, alive, game, units } from '../battle/world';
 import { flagMode, flags, plantFlag, removeFlag } from '../battle/flags';
 import { XMAX, XMIN, ZMAX, ZMIN, surfaceY } from '../terrain/grid';
 import { pickables } from '../world/terrain';
-import { hand, toast } from '../ui/hud';
+import { hand, setFlagMode, toast } from '../ui/hud';
+import { buddy, useSkill } from '../buddy/buddy';
+import { buddyUI } from '../ui/buddyUI';
 
 // カメラ操作と、地面タップでの出撃
 //  - 1本指ドラッグ / マウス左ドラッグ：視点を動かす
@@ -122,7 +124,18 @@ function flagTap(e: PointerEvent, ground: THREE.Vector3 | null): void {
   flagMode.selected.clear();
 }
 
+buddyUI.onSkillAim = () => {
+  hand.selected = null;
+  setFlagMode(false);
+  toast(buddy.def?.id === 'uni' ? '回復する場所をタップしてください' : '鼓舞する場所をタップしてください', 2.5);
+};
+
 function tap(e: PointerEvent): void {
+  if (buddy.targeting && !game.over) {
+    const p = groundHit(e);
+    if (p) useSkill(p.x, p.z);
+    return;
+  }
   if (flagMode.on && !game.over) {
     flagTap(e, groundHit(e));
     return;

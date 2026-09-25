@@ -38,6 +38,8 @@ export function canCapture(u: Unit, v: Vein): boolean {
   return u.air || u.layer === v.layer;
 }
 const CAPTURE_SPEED = 0.35;
+/** 陣営ごとの占領の速さの倍率（バディのスキルで上がる） */
+export const captureBoost: [number, number] = [1, 1];
 
 const veinV = new Vox();
 [[0, 0, 0, 5], [-2, 0, -1, 3], [1, 0, -2, 4], [2, 0, 1, 3], [-1, 0, 2, 2], [-3, 0, 1, 2]].forEach(([x, y, z, h]) => {
@@ -102,8 +104,8 @@ export function updateVeins(dt: number): void {
     }
     const prev = v.owner;
     // 数が多いほど速い（3体まで）。両軍がいると止まる
-    if (c0 && !c1) v.meter = Math.min(1, v.meter + dt * CAPTURE_SPEED * Math.min(c0, 3));
-    if (c1 && !c0) v.meter = Math.max(-1, v.meter - dt * CAPTURE_SPEED * Math.min(c1, 3));
+    if (c0 && !c1) v.meter = Math.min(1, v.meter + dt * CAPTURE_SPEED * captureBoost[0] * Math.min(c0, 3));
+    if (c1 && !c0) v.meter = Math.max(-1, v.meter - dt * CAPTURE_SPEED * captureBoost[1] * Math.min(c1, 3));
     if (v.meter >= 1) v.owner = 0;
     else if (v.meter <= -1) v.owner = 1;
     else if ((v.owner === 0 && v.meter <= 0) || (v.owner === 1 && v.meter >= 0)) v.owner = -1;

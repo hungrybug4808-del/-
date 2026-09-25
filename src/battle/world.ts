@@ -23,10 +23,11 @@ export const inOwnHalf = (team: Team, z: number) => (team === 0 ? z < TEAM[0].ha
 export const units: Unit[] = [];
 export const blds: Building[] = [];
 
-export const game = { over: false, winner: -1 as -1 | Team, endT: 0 };
+/** phase：select はバディ選びの間（試合は止まっている）。time は試合の経過秒 */
+export const game = { over: false, winner: -1 as -1 | Team, endT: 0, time: 0, phase: 'select' as 'select' | 'battle' };
 
 /** ダメージを受けたときの追加の処理（スライムの分裂など。units.ts が差し替える） */
-export const hooks = { onHurt: (_e: Unit, _dmg: number): void => {} };
+export const hooks = { onHurt: (_e: Unit, _dmg: number): void => {}, onDeath: (_e: Unit): void => {} };
 
 /** 画面に短いメッセージを出す（UI 側が差し替える） */
 export const notify = { toast: (_msg: string): void => {} };
@@ -82,9 +83,14 @@ export function aimPoint(t: Target, from: { x: number; z: number }): THREE.Vecto
   return new THREE.Vector3(t.pos.x, aimY(t), t.pos.z);
 }
 
+/** バディのスキルなどによる一時的な強化 */
+export const buffed = (u: Unit, key: 'haste' | 'range') => (u.mem[key] ?? -1) > game.time;
+/** 射程アップの強化で伸びる分 */
+export const RANGE_BUFF = 2.5;
+
 /** 遠距離モンスターの射程。陸の遠距離は高い所にいるほど伸びる */
 export function rangeOf(u: Unit, t: Target): number {
-  const r = u.d.range;
+  const r = u.d.range + (u.d.ranged && buffed(u, 'range') ? RANGE_BUFF : 0);
   if (!u.d.ranged || u.layer !== 'land') return r;
   return r + cl((u.pos.y - t.pos.y) * HIGH_GROUND_PER, 0, HIGH_GROUND_MAX);
 }
@@ -115,6 +121,7 @@ export function hurt(e: Unit, dmg: number): void {
   if (e.hp <= 0) {
     e.hp = 0;
     setState(e, 'dead');
+    hooks.onDeath(e);
   } else hooks.onHurt(e, dmg);
 }
 export function hurtBld(b: Building, dmg: number): void {

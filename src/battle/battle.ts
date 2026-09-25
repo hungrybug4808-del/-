@@ -115,7 +115,9 @@ export function playerSpawn(type: UnitType, x: number, z: number, hitY: number):
 }
 
 export function stepBattle(dt: number, time: number): void {
+  if (game.phase !== 'battle') { drawVeins(time); return; }
   if (!game.over) {
+    game.time += dt;
     player.mana = Math.min(MANA_MAX, player.mana + dt * manaRate(0));
     cpu.mana = Math.min(MANA_MAX, cpu.mana + dt * manaRate(1));
     updateForts(dt);
@@ -142,4 +144,6 @@ export function restartBattle(): void {
   game.over = false;
   game.winner = -1;
   game.endT = 0;
+  game.time = 0;
+  game.phase = 'select';
 }

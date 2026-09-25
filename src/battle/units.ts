@@ -14,7 +14,7 @@ import {
 } from '../terrain/grid';
 import { FlowField, canStep, findPath, walkable } from '../terrain/nav';
 import {
-  TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, canHit, game, hdist, hooks, inRange, notify, rangeOf, setState, units, validTarget,
+  TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, buffed, canHit, game, hdist, hooks, inRange, notify, rangeOf, setState, units, validTarget,
 } from './world';
 
 /** 場所ごとの高さ：陸は地面、海は水面、空は下の地形（その上を飛ぶ） */
@@ -368,14 +368,23 @@ function mergeSlimes(dt: number): void {
   }
 }
 
+/** 強化中は攻撃も移動も速い */
+export const HASTE_MUL = 1.5;
+const unitDt = (u: Unit, dt: number) => (buffed(u, 'haste') ? dt * HASTE_MUL : dt);
+
 export function updateUnits(dt: number): void {
-  for (const u of units) unitLogic(u, dt);
+  for (const u of units) unitLogic(u, unitDt(u, dt));
   mergeSlimes(dt);
   separate();
   for (let i = units.length - 1; i >= 0; i--) {
     const u = units[i];
     if (u.remove) { removeUnit(u); units.splice(i, 1); continue; }
-    drawUnit(u, dt);
+    drawUnit(u, unitDt(u, dt));
+    // 強化中のしるし（金＝強化、緑＝射程アップ）
+    if (alive(u) && Math.random() < 0.25) {
+      if (buffed(u, 'haste')) sparkle({ x: u.pos.x, y: u.pos.y + (u.air ? u.P.rootY : 0.3), z: u.pos.z }, 1, [0xffd34d, 0xfff2b0]);
+      if (buffed(u, 'range')) sparkle({ x: u.pos.x, y: u.pos.y + (u.air ? u.P.rootY : 0.3), z: u.pos.z }, 1, [0x8ff0a0, 0xd8ffe0]);
+    }
   }
 }
 
