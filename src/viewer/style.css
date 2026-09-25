@@ -1,0 +1,53 @@
+/* キャラ図鑑（試作の cyclops.html と同じ見た目） */
+:root{
+  --bg:#e8f0f4; --panel:#ffffff; --ink:#1a2631; --sub:#566877; --line:#cfdbe4;
+  --accent:#1f7fa6; --accent-ink:#ffffff; --btn:#f1f6f9; --btn-h:#e0edf3; --stage:#cfe6f0; --chip:#d9eef7;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10161c; --panel:#18212a; --ink:#e3ebf1; --sub:#93a6b6; --line:#2a3743;
+    --accent:#56c0e6; --accent-ink:#0a1920; --btn:#1f2a34; --btn-h:#283744; --stage:#1b2733; --chip:#1c3240;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10161c; --panel:#18212a; --ink:#e3ebf1; --sub:#93a6b6; --line:#2a3743;
+  --accent:#56c0e6; --accent-ink:#0a1920; --btn:#1f2a34; --btn-h:#283744; --stage:#1b2733; --chip:#1c3240;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:16px 16px 32px}
+.picker{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.picker a{flex:0 0 auto;text-decoration:none;color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:13px;white-space:nowrap}
+.picker a:hover{background:var(--btn-h)}
+.picker a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.picker a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.picker .sep{flex:0 0 1px;background:var(--line);margin:2px 4px}
+h1{font-family:"DotGothic16","Hiragino Sans",monospace;font-weight:400;font-size:clamp(28px,5vw,40px);margin:0;letter-spacing:.06em}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 16px}
+.tag{background:var(--chip);border-radius:999px;padding:2px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.layout{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:880px){.layout{grid-template-columns:minmax(0,1fr) 290px}}
+.stage{position:relative;background:var(--stage);border-radius:18px;overflow:hidden;aspect-ratio:4/3;border:1px solid var(--line);max-width:100%}
+@media(min-width:880px){.stage{aspect-ratio:auto;min-height:580px}}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.label{position:absolute;left:12px;top:12px;font-family:"DotGothic16",monospace;background:rgba(10,20,30,.55);color:#fff;padding:3px 10px;border-radius:8px;font-size:15px}
+.say{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:calc(100% - 24px);width:max-content;background:var(--panel);color:var(--ink);border-radius:12px;padding:6px 12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.say[hidden]{display:none}
+.hint{position:absolute;right:12px;bottom:8px;font-size:12px;color:var(--sub)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:700}
+.moves{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+@media(min-width:880px){.moves{grid-template-columns:1fr}}
+.moves button{font:inherit;text-align:left;background:var(--btn);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:8px 12px;cursor:pointer}
+.moves button:hover{background:var(--btn-h)}
+.moves button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.moves button.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.moves b{display:block;font-size:15px}
+.moves span{font-size:12px;opacity:.85}
+.memo{margin:14px 0 0;font-size:13px;color:var(--sub)}

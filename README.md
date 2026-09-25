@@ -9,7 +9,16 @@ three.js + TypeScript + Vite。キャラクター・建物・地形はすべて�
 npm install
 npm run dev      # 開発サーバー（同じネットワークのスマホからも開ける）
 npm run build    # dist/index.html に1ファイルでまとめて出力（ダブルクリックで開ける）
+                 # あわせて、キャラ図鑑を dist/characters/<キャラ>.html に1体ずつ出力
 ```
+
+### キャラ図鑑
+
+試作の cyclops.html などと同じように、キャラを1体ずつ出して、モーション（召喚・待機・移動・攻撃・被弾・撃破、サイクロプスの城への攻撃とアイビーム、バディの提案・喜ぶ・スキル）をボタンで1つずつ再生できる。
+ゲーム本体と同じキャラの定義（`src/units/`・`src/buddy/`）を使うので、キャラを直せば図鑑にもそのまま反映される。
+
+- ビルド後：`dist/characters/cyclops.html` のように、キャラごとに1ファイル（ダブルクリックで開ける）。上の一覧から他のキャラにも切り替えられる
+- 開発中：`npm run dev` のあと `/chara.html#cyclops` を開く
 
 ## 構成
 
@@ -24,6 +33,7 @@ npm run build    # dist/index.html に1ファイルでまとめて出力（ダ�
 | `src/world/` | 地形・水（川の流れ・滝・渦潮）の描画と、空の気候（雲・雪・雨・砂嵐） |
 | `src/buddy/` | バディ4人のモデル（`models.ts`）と、ゲージ・スキル・作戦の提案（`buddy.ts`） |
 | `src/ui/`, `src/input/` | HUD と手札、カメラ操作（移動・回転・ズーム）とタップでの出撃 |
+| `chara.html`, `src/viewer/` | キャラ図鑑（1体ずつモーションを確認するページ） |
 | `prototypes/` | チャットで作った試作 HTML（見た目・モーションの基準） |
 
 ### モンスターを増やすとき
