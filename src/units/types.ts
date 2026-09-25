@@ -28,6 +28,12 @@ export interface Building {
   radius: number;
   /** 砦の矢の再装填 */
   cd: number;
+  /** 横に長い建物（魔王城）の範囲 */
+  box?: { x0: number; x1: number; z0: number; z1: number };
+  /** 狙われる高さ（地面から） */
+  aimH: number;
+  /** 敷地のマス（通れない） */
+  cells: number[];
 }
 
 export interface Unit<R extends Rig = Rig> {
@@ -38,6 +44,7 @@ export interface Unit<R extends Rig = Rig> {
   rig: R;
   mat: THREE.MeshLambertMaterial;
   hp: number;
+  /** 位置。y は立っている地面（空なら下の地形）の高さ */
   pos: THREE.Vector3;
   /** 向きたい方向と、実際に表示している（なめらかに追従する）向き */
   yaw: number;
@@ -62,6 +69,10 @@ export interface Unit<R extends Rig = Rig> {
   aimPitch: number;
   inhale: number;
   prevC?: number;
+  /** 経路：向かっている途中の点と、再計算までの時間 */
+  path: { x: number; z: number; center?: boolean }[];
+  pathT: number;
+  pathGoal: { x: number; z: number } | null;
   remove?: boolean;
   ringM: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   bar: THREE.Group;
@@ -86,6 +97,8 @@ export interface UnitDef<R extends Rig = Rig> {
   layer: Layer;
   /** 空の敵を攻撃できるか（遠距離なら true） */
   hitAir: boolean;
+  /** 遠距離攻撃か（高台で射程が伸びる） */
+  ranged: boolean;
   /** 地上にいるときに狙われる高さ */
   hitH: number;
   barH: number;

@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { cl, rnd } from '../core/math';
+import { rnd } from '../core/math';
 import { DEF } from '../units/registry';
 import type { Team, UnitType } from '../units/types';
 import { forts, resetBuildings, updateBuildings } from './buildings';
 import { clearArrows, fireArrowFrom, updateArrows } from './projectiles';
 import { clearUnits, spawnUnit, updateUnits } from './units';
 import { VEIN_BONUS, drawVeins, ownedVeins, resetVeins, updateVeins } from './veins';
-import { alive, bldAlive, game, hdist, units } from './world';
+import { XMAX, XMIN, ZMAX, ZMIN, cellAt, passable, walkY } from '../terrain/grid';
+import { alive, bldAlive, game, hdist, inOwnHalf, units } from './world';
 
 // 1試合の進行：魔素・砦・竜脈・CPU・勝敗
 
@@ -37,7 +38,7 @@ function updateForts(dt: number): void {
       if (d < bd) { bd = d; best = e; }
     }
     if (best) {
-      fireArrowFrom(new THREE.Vector3(f.pos.x, 2.6, f.pos.z), best, FORT_DMG, f.pos.x);
+      fireArrowFrom(new THREE.Vector3(f.pos.x, f.pos.y + 3.2, f.pos.z), best, FORT_DMG, f.pos);
       f.cd = FORT_CD;
     }
   }
@@ -55,23 +56,40 @@ function cpuThink(dt: number): void {
   }
   const cost = DEF[cpu.next].cost;
   if (cpu.mana >= cost && Math.random() < 0.6) {
-    const x = rnd(-3.5, 3.5), z = rnd(4, 10);
     const n = cpu.next === 'archer' ? Math.min(2, Math.floor(cpu.mana)) : 1;
-    for (let i = 0; i < n; i++) {
-      spawnUnit(cpu.next, 1, cl(x + (i - 1) * 0.8, -5, 5), z + rnd(-0.3, 0.3));
-      cpu.mana -= cost;
+    // 自陣の、砦と魔王城のあいだあたりの出せる場所
+    for (let tries = 0; tries < 30; tries++) {
+      const x = rnd(-6, 6), z = rnd(12, 27);
+      if (!canSpawnAt(cpu.next, 1, x, z)) continue;
+      for (let i = 0; i < n; i++) {
+        const sx = x + (i - 1) * 0.8, sz = z + rnd(-0.3, 0.3), ok = canSpawnAt(cpu.next, 1, sx, sz);
+        spawnUnit(cpu.next, 1, ok ? sx : x, ok ? sz : z);
+        cpu.mana -= cost;
+      }
+      cpu.next = null;
+      break;
     }
-    cpu.next = null;
   }
 }
 
-/** プレイヤーの出撃。魔素が足りなければ false */
-export function playerSpawn(type: UnitType, x: number, z: number): boolean {
+/** 出せる場所か：自陣で、陸のモンスターなら立てる地面（深い水・崖の上の尾根などは不可） */
+export function canSpawnAt(type: UnitType, team: Team, x: number, z: number, hitY?: number): boolean {
+  if (!inOwnHalf(team, z) || x < XMIN + 0.5 || x > XMAX - 0.5 || z < ZMIN + 0.5 || z > ZMAX - 0.5) return false;
+  if (DEF[type].layer === 'air') return true;
+  const c = cellAt(x, z);
+  if (!passable(c)) return false;
+  return hitY === undefined || Math.abs(hitY - walkY[c]) < 1.2;
+}
+
+export type SpawnResult = 'ok' | 'mana' | 'place';
+/** プレイヤーの出撃 */
+export function playerSpawn(type: UnitType, x: number, z: number, hitY: number): SpawnResult {
   const d = DEF[type];
-  if (player.mana < d.cost) return false;
+  if (!canSpawnAt(type, 0, x, z, hitY)) return 'place';
+  if (player.mana < d.cost) return 'mana';
   player.mana -= d.cost;
   spawnUnit(type, 0, x, z);
-  return true;
+  return 'ok';
 }
 
 export function stepBattle(dt: number, time: number): void {

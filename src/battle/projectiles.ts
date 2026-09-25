@@ -10,7 +10,7 @@ interface Arrow {
   from: THREE.Vector3;
   end: THREE.Vector3;
   target: Target;
-  x: number;
+  from2: { x: number; z: number };
   s: number;
   dur: number;
   arc: number;
@@ -29,23 +29,23 @@ const V = new THREE.Vector3();
 const FWD = new THREE.Vector3(0, 0, 1);
 
 /** 矢を放つ。狙いを追いかけて山なりに飛ぶ（必中） */
-export function fireArrowFrom(from: THREE.Vector3, target: Target, dmg: number, x: number): void {
+export function fireArrowFrom(from: THREE.Vector3, target: Target, dmg: number, shooter: { x: number; z: number }): void {
   const g = new THREE.Group();
   ([[gShaft, mShaft, -0.27], [gHead, mHead, -0.03], [gF, mF, -0.48]] as const).forEach(([geo, m, z]) => {
     const me = new THREE.Mesh(geo, m);
     me.position.z = z;
     g.add(me);
   });
-  const end = aimPoint(target, x), dist = from.distanceTo(end);
+  const src = { x: shooter.x, z: shooter.z }, end = aimPoint(target, src), dist = from.distanceTo(end);
   scene.add(g);
-  arrows.push({ g, from: from.clone(), end, target, x, s: 0, dur: dist / 13 + 0.1, arc: 0.2 + dist * 0.05, dmg, prev: from.clone() });
+  arrows.push({ g, from: from.clone(), end, target, from2: src, s: 0, dur: dist / 13 + 0.1, arc: 0.2 + dist * 0.05, dmg, prev: from.clone() });
 }
 
 export function updateArrows(dt: number): void {
   for (let i = arrows.length - 1; i >= 0; i--) {
     const a = arrows[i];
     a.s += dt / a.dur;
-    if (a.target.isBld ? bldAlive(a.target) : alive(a.target)) a.end.copy(aimPoint(a.target, a.x));
+    if (a.target.isBld ? bldAlive(a.target) : alive(a.target)) a.end.copy(aimPoint(a.target, a.from2));
     const s = Math.min(a.s, 1);
     V.copy(a.from).lerp(a.end, s);
     V.y += a.arc * 4 * s * (1 - s);

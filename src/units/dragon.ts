@@ -297,8 +297,8 @@ function pose(u: Unit<DragonRig>, T: Pose): void {
     if (t >= 1.1 && !u.fired.crash) {
       u.fired.crash = 1;
       addShake(0.3);
-      ring(u.pos, 0xd9cdb5, 3.5, 0.7);
-      dust(u.pos, 30, 1.8);
+      ring({ x: u.pos.x, z: u.pos.z }, 0xd9cdb5, 3.5, 0.7);
+      dust({ x: u.pos.x, z: u.pos.z }, 30, 1.8);
     }
   } else {
     T.rootRZ = 0.04 * Math.sin(u.life * 1.3);
@@ -312,7 +312,7 @@ function apply(u: Unit<DragonRig>, dt: number): void {
   u.fp += dt * P.flapF;
   u.tp += dt * P.tailF;
   const sf = Math.sin(u.fp);
-  r.root.position.set(u.pos.x, P.rootY - 0.1 * P.flapA * sf, u.pos.z);
+  r.root.position.set(u.pos.x, u.pos.y + P.rootY - 0.1 * P.flapA * sf, u.pos.z);
   r.root.rotation.set(P.rootRX, u.yawS, P.rootRZ);
   r.n1.rotation.x = P.n1;
   r.n2.rotation.x = P.n2;
@@ -364,7 +364,7 @@ const DPS = 55, CASTLE_DPS = 65;
 
 export const dragon: UnitDef<DragonRig> = {
   type: 'dragon', name: 'ドラゴンライダー', icon: '🐉', sub: '空・ブレス', cost: 5,
-  hp: 420, speed: 1.1, range: 5, aggro: 7.5, radius: 1.3, layer: 'air', hitAir: true, hitH: 2.6,
+  hp: 420, speed: 1.1, range: 5, aggro: 7.5, radius: 1.3, layer: 'air', hitAir: true, ranged: true, hitH: 2.6,
   barH: 4.4, barW: 1.6, ringR: 1.4, spawnT: 1.2, deathT: 2.8, smooth: 8,
   make: makeDragon,
   base: () => ({
@@ -375,7 +375,7 @@ export const dragon: UnitDef<DragonRig> = {
   cycle: () => 3.0,
   pose, apply, post,
   aim(u, p, hd) {
-    u.aimPitch = Math.atan2(3.3 - p.y, Math.max(hd - 2.3, 0.5));
+    u.aimPitch = Math.atan2(u.pos.y + 3.3 - p.y, Math.max(hd - 2.3, 0.5));
   },
   attack(u, dt, ok) {
     const tgt = u.target;
@@ -384,12 +384,12 @@ export const dragon: UnitDef<DragonRig> = {
     if (tgt.isBld) hurtBld(tgt, CASTLE_DPS * dt);
     else {
       // ブレスは範囲攻撃。狙った相手と同じ場所（空か地上）の敵を焼く
-      const p = aimPoint(tgt, u.pos.x);
+      const p = aimPoint(tgt, u.pos);
       for (const e of units)
         if (e.team !== u.team && alive(e) && e.air === tgt.air && Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < 1.9 + e.radius * 0.5)
           hurt(e, DPS * dt);
       if (!tgt.air && Math.random() < 0.5)
-        solid.spawn(vec(p.x + rnd(-0.4, 0.4), 0.2, p.z + rnd(-0.4, 0.4)), vec(0, rnd(0.6, 1.2), 0), rnd(1, 1.5), rnd(0.15, 0.25), 0x5e5750, -0.3, 0.8, { gr: 1.5 });
+        solid.spawn(vec(p.x + rnd(-0.4, 0.4), tgt.pos.y + 0.2, p.z + rnd(-0.4, 0.4)), vec(0, rnd(0.6, 1.2), 0), rnd(1, 1.5), rnd(0.15, 0.25), 0x5e5750, -0.3, 0.8, { gr: 1.5 });
     }
     addShake(0.03);
   },

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { eIn, eOut, hash, kf, rnd, seg, vec, type Key } from '../core/math';
 import { Vox, part } from '../core/voxel';
 import { addShake, dust, ring, solid } from '../fx/effects';
-import { alive, hurt, hurtBld, units } from '../battle/world';
+import { alive, canHit, hurt, hurtBld, units } from '../battle/world';
 import type { Pose, Rig, Unit, UnitDef } from './types';
 
 // サイクロプス：約2頭身、水色の肌、黄色い虹彩に縦長の瞳の一つ目、ツノ1本、トゲ付き棍棒
@@ -104,7 +104,7 @@ function pose(u: Unit<CyclopsRig>, T: Pose, dt: number): void {
     });
     const c = Math.cos(f);
     if (u.prevC !== undefined && Math.sign(c) !== Math.sign(u.prevC)) {
-      dust({ x: u.pos.x + rnd(-0.3, 0.3), z: u.pos.z }, 5, 0.7);
+      dust({ x: u.pos.x + rnd(-0.3, 0.3), y: u.pos.y, z: u.pos.z }, 5, 0.7);
       addShake(0.02);
     }
     u.prevC = c;
@@ -152,7 +152,7 @@ function pose(u: Unit<CyclopsRig>, T: Pose, dt: number): void {
 
 function apply(u: Unit<CyclopsRig>): void {
   const r = u.rig, P = u.P;
-  r.root.position.set(u.pos.x, P.rootY, u.pos.z);
+  r.root.position.set(u.pos.x, u.pos.y + P.rootY, u.pos.z);
   r.root.rotation.set(P.rootRX, u.yawS, 0);
   r.torso.rotation.set(P.torsoRX, P.torsoRY, P.torsoRZ);
   r.torso.scale.y = P.torsoSY;
@@ -173,26 +173,26 @@ function attack(u: Unit<CyclopsRig>, _dt: number, ok: boolean): void {
     u.fired.hit = 1;
     const px = u.pos.x + Math.sin(u.yaw) * 1.3, pz = u.pos.z + Math.cos(u.yaw) * 1.3;
     for (const e of units)
-      if (e.team !== u.team && alive(e) && !e.air && Math.hypot(e.pos.x - px, e.pos.z - pz) < 1.7 + e.radius) hurt(e, DMG);
-    dust({ x: px, z: pz }, 8, 0.9);
+      if (e.team !== u.team && alive(e) && canHit(u, e) && Math.hypot(e.pos.x - px, e.pos.z - pz) < 1.7 + e.radius) hurt(e, DMG);
+    dust({ x: px, y: u.pos.y, z: pz }, 8, 0.9);
     addShake(0.05);
   }
   if (u.atk === 'castle' && u.st >= 1.66 && !u.fired.hit) {
     u.fired.hit = 1;
     if (ok && u.target?.isBld) hurtBld(u.target, CASTLE_DMG);
     u.rig.tip.getWorldPosition(V);
-    const p = { x: V.x, z: V.z };
+    const p = { x: V.x, y: u.pos.y, z: V.z };
     ring(p, 0xffffff, 3, 0.55);
     dust(p, 20, 1.5);
     addShake(0.3);
     for (let k = 0; k < 20; k++)
-      solid.spawn(vec(p.x, 0.2, p.z), vec(rnd(-2.5, 2.5), rnd(2, 4), rnd(-2.5, 2.5)), rnd(0.7, 1.1), rnd(0.08, 0.15), Math.random() < 0.5 ? 0x8a8f99 : 0x7a5a3c, 9);
+      solid.spawn(vec(p.x, p.y + 0.2, p.z), vec(rnd(-2.5, 2.5), rnd(2, 4), rnd(-2.5, 2.5)), rnd(0.7, 1.1), rnd(0.08, 0.15), Math.random() < 0.5 ? 0x8a8f99 : 0x7a5a3c, 9);
   }
 }
 
 export const cyclops: UnitDef<CyclopsRig> = {
   type: 'cyclops', name: 'サイクロプス', icon: '👁️', sub: '陸・近接', cost: 5,
-  hp: 650, speed: 0.55, range: 1.5, aggro: 4.5, radius: 0.9, layer: 'land', hitAir: false, hitH: 1.6,
+  hp: 650, speed: 0.55, range: 1.5, aggro: 4.5, radius: 0.9, layer: 'land', hitAir: false, ranged: false, hitH: 1.6,
   barH: 3.5, barW: 1.4, ringR: 1.0, spawnT: 0.8, deathT: 2.2, smooth: 14,
   make: makeCyclops,
   base: () => ({

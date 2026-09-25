@@ -4,6 +4,8 @@ import { Vox, part } from '../core/voxel';
 import { addShake, dust } from '../fx/effects';
 import { scene } from '../render/stage';
 import type { Building, Team } from '../units/types';
+import { MAP } from '../terrain/generate';
+import { CELL, NX, NZ, blocked, colOf, cx, cz, groundY } from '../terrain/grid';
 import { TEAM, blds } from './world';
 
 const S1 = 0x8a8f99, S2 = 0x6e737c, S3 = 0x9da3ad;
@@ -67,25 +69,52 @@ function fortVox(team: Team): Vox {
 export const CASTLE_HP = 2500;
 export const FORT_HP = 900;
 
+const CASTLE_S = 0.45, FORT_S = 0.3;
+
 function makeBuilding(kind: Building['kind'], team: Team, z: number): Building {
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const g = kind === 'castle'
-    ? part('castle' + team, castleVox(team), 0, 0, 0, 0.35, mat)
-    : part('fort' + team, fortVox(team), 0, 0, 0, 0.25, mat);
-  g.position.set(0, 0, z);
+  const castle = kind === 'castle';
+  const g = castle
+    ? part('castle' + team, castleVox(team), 0, 0, 0, CASTLE_S, mat)
+    : part('fort' + team, fortVox(team), 0, 0, 0, FORT_S, mat);
+  const y = groundY(0, z);
+  g.position.set(0, y, z);
   if (team === 1) g.rotation.y = Math.PI;
   scene.add(g);
-  const max = kind === 'castle' ? CASTLE_HP : FORT_HP;
+  const max = castle ? CASTLE_HP : FORT_HP;
+  // 魔王城は正面（中央側）が z の +2、背中が -6（ボクセル単位）
+  const back = z - TEAM[team].dir * 6 * CASTLE_S, front = z + TEAM[team].dir * 2 * CASTLE_S;
   const b: Building = {
     isBld: true, kind, team, g, mat, hp: max, max, flash: 0, fallT: -1,
-    pos: new THREE.Vector3(0, 0, z), radius: kind === 'castle' ? 3 : 1.25, cd: 1,
+    pos: new THREE.Vector3(0, y, z), radius: castle ? 3 : 1.25, cd: 1,
+    box: castle ? { x0: -12 * CASTLE_S, x1: 12 * CASTLE_S, z0: Math.min(back, front), z1: Math.max(back, front) } : undefined,
+    aimH: castle ? 2.3 : 1.7, cells: [],
   };
+  // 敷地のマスを塞ぐ
+  for (let iz = 0; iz < NZ; iz++)
+    for (let ix = 0; ix < NX; ix++) {
+      const x = cx(ix), zz = cz(iz);
+      const inside = b.box
+        ? x > b.box.x0 - CELL * 0.4 && x < b.box.x1 + CELL * 0.4 && zz > b.box.z0 - CELL * 0.4 && zz < b.box.z1 + CELL * 0.4
+        : Math.hypot(x, zz - z) < b.radius + 0.1;
+      if (inside) b.cells.push(colOf(ix, iz));
+    }
   blds.push(b);
   return b;
 }
 
-export const castles = ([0, 1] as const).map(team => makeBuilding('castle', team, team === 0 ? -13.1 : 13.1));
-export const forts = ([0, 1] as const).map(team => makeBuilding('fort', team, team === 0 ? -6.8 : 6.8));
+export const castles = ([0, 1] as const).map(team => makeBuilding('castle', team, TEAM[team].castleZ));
+export const forts = ([0, 1] as const).map(team => makeBuilding('fort', team, team === 0 ? -MAP.fortZ : MAP.fortZ));
+
+/** 建物の変化（崩れた・建て直した）を経路探索に知らせる */
+export const bldEvents = { changed: (): void => {} };
+
+function applyBlocked(): void {
+  blocked.fill(0);
+  for (const b of blds) if (b.hp > 0) for (const c of b.cells) blocked[c] = 1;
+  bldEvents.changed();
+}
+applyBlocked();
 
 /** 被弾の光と、落ちたときに崩れて沈む演出 */
 export function updateBuildings(dt: number): void {
@@ -95,13 +124,15 @@ export function updateBuildings(dt: number): void {
     if (c.fallT < 0) continue;
     c.fallT += dt;
     const depth = c.kind === 'castle' ? 4.5 : 3;
-    c.g.position.y = -depth * eIn(seg(c.fallT, 0, 1.8));
+    if (c.fallT === dt) applyBlocked();
+    c.g.position.y = c.pos.y - depth * eIn(seg(c.fallT, 0, 1.8));
     c.g.rotation.z = 0.05 * Math.sin(c.fallT * 30) * (1 - seg(c.fallT, 0, 1.8));
     if (c.fallT < 1.8) {
       addShake(c.kind === 'castle' ? 0.15 : 0.06);
       if (Math.random() < 0.6) {
         const w = c.kind === 'castle' ? 3 : 1.2;
-        dust({ x: c.pos.x + rnd(-w, w), z: (c.kind === 'castle' ? TEAM[c.team].front : c.pos.z) + rnd(-1, 1) }, 3, 1.5);
+        const fz = c.box ? (c.team === 0 ? c.box.z1 : c.box.z0) : c.pos.z;
+        dust({ x: c.pos.x + rnd(-w, w), z: fz + rnd(-1, 1) }, 3, 1.5);
       }
     } else c.g.visible = false;
   }
@@ -111,10 +142,11 @@ export function resetBuildings(): void {
   for (const c of blds) {
     c.hp = c.max;
     c.fallT = -1;
-    c.g.position.y = 0;
+    c.g.position.y = c.pos.y;
     c.g.rotation.z = 0;
     c.flash = 0;
     c.g.visible = true;
     c.cd = 1;
   }
+  applyBlocked();
 }

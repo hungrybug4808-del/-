@@ -3,6 +3,8 @@ import { hash, rnd, vec } from '../core/math';
 import { Vox, part } from '../core/voxel';
 import { glow, ring, sparkle } from '../fx/effects';
 import { camera, scene } from '../render/stage';
+import { MAP } from '../terrain/generate';
+import { groundY } from '../terrain/grid';
 import type { Team, Unit } from '../units/types';
 import { BAR_BG, BAR_GEO } from './bars';
 import { TEAM, alive, hdist, notify, units } from './world';
@@ -36,16 +38,18 @@ for (let x = -4; x <= 3; x++)
     if (r > 2.6 && r < 4.2) veinV.set(x, -1, z, hash(x, 9, z) > 0.5 ? 0x6e737c : 0x8a8f99);
   }
 
-export const veins: Vein[] = [-3.8, 3.8].map(x => {
+// 陸の竜脈（中央の丘の上）。海と空の竜脈は第3段階で足す
+export const veins: Vein[] = [MAP.hill].map(({ x, z }) => {
+  const y = groundY(x, z);
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const g = part('vein', veinV, 0, -1, 0, 0.14, mat);
-  g.position.set(x, 0, 0);
+  g.position.set(x, y, z);
   scene.add(g);
   const rm = new THREE.Mesh(new THREE.RingGeometry(1.35, 1.5, 40), new THREE.MeshBasicMaterial({
     color: 0xd9c8ff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
   }));
   rm.rotation.x = -Math.PI / 2;
-  rm.position.set(x, 0.03, 0);
+  rm.position.set(x, y + 0.03, z);
   scene.add(rm);
   const bar = new THREE.Group(), bg = new THREE.Mesh(BAR_GEO, BAR_BG);
   const fill = new THREE.Mesh(BAR_GEO, new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true }));
@@ -55,9 +59,9 @@ export const veins: Vein[] = [-3.8, 3.8].map(x => {
   bg.renderOrder = 10;
   fill.renderOrder = 11;
   bar.add(bg, fill);
-  bar.position.set(x, 1.3, 0);
+  bar.position.set(x, y + 1.3, z);
   scene.add(bar);
-  return { pos: new THREE.Vector3(x, 0, 0), g, mat, rm, bar, fill, meter: 0, owner: -1 as const };
+  return { pos: new THREE.Vector3(x, y, z), g, mat, rm, bar, fill, meter: 0, owner: -1 as const };
 });
 
 export function ownedVeins(team: Team): number {
@@ -95,7 +99,7 @@ export function updateVeins(dt: number): void {
     if (own !== prev) {
       if (own !== -1) {
         ring(v.pos, TEAM[own].color, 3, 0.6);
-        sparkle({ x: v.pos.x, y: 0.5, z: v.pos.z }, 24, [TEAM[own].color, 0xffffff], 1.5);
+        sparkle({ x: v.pos.x, y: v.pos.y + 0.5, z: v.pos.z }, 24, [TEAM[own].color, 0xffffff], 1.5);
       }
       if (own === 0) notify.toast('竜脈を占領！ 魔素の回復が速くなった');
       else if (own === 1) notify.toast('敵に竜脈を占領された');
@@ -117,7 +121,7 @@ export function drawVeins(t: number): void {
     v.fill.position.x = -(1 - m) * 0.6;
     v.bar.quaternion.copy(camera.quaternion);
     if (Math.random() < 0.3)
-      glow.spawn(vec(v.pos.x + rnd(-0.5, 0.5), 0.3, v.pos.z + rnd(-0.5, 0.5)), vec(0, rnd(0.6, 1.2), 0), rnd(0.6, 1.0), rnd(0.03, 0.06), col.getHex(), -0.3);
+      glow.spawn(vec(v.pos.x + rnd(-0.5, 0.5), v.pos.y + 0.3, v.pos.z + rnd(-0.5, 0.5)), vec(0, rnd(0.6, 1.2), 0), rnd(0.6, 1.0), rnd(0.03, 0.06), col.getHex(), -0.3);
   }
 }
 

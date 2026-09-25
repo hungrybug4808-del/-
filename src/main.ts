@@ -1,12 +1,14 @@
 import './style.css';
 import { camera, renderer, scene } from './render/stage';
-import { buildGround } from './world/ground';
+import { buildTerrain, updateTerrain } from './world/terrain';
+import { buildSky, updateSky } from './world/sky';
 import { restartBattle, stepBattle } from './battle/battle';
 import { updateEffects } from './fx/effects';
 import { onRestart, updateHud } from './ui/hud';
 import { updateCamera } from './input/controls';
 
-buildGround();
+buildTerrain();
+buildSky();
 onRestart(restartBattle);
 
 let last = performance.now(), time = 0;
@@ -15,6 +17,8 @@ function frame(now: number): void {
   last = now;
   time += dt;
   stepBattle(dt, time);
+  updateTerrain(dt, time);
+  updateSky(dt, time);
   updateEffects(dt);
   updateHud(dt);
   updateCamera(dt, time);

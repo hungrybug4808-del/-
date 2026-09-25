@@ -129,7 +129,7 @@ const QB = new THREE.Quaternion(), QP = new THREE.Quaternion(), EB = new THREE.E
 
 function apply(u: Unit<ArcherRig>): void {
   const r = u.rig, P = u.P;
-  r.root.position.set(u.pos.x, P.rootY, u.pos.z);
+  r.root.position.set(u.pos.x, u.pos.y + P.rootY, u.pos.z);
   r.root.rotation.set(P.rootRX, u.yawS, 0);
   r.torso.rotation.set(P.torsoRX, P.torsoRY, 0);
   r.torso.scale.y = P.torsoSY;
@@ -161,7 +161,7 @@ const V = new THREE.Vector3();
 
 export const archer: UnitDef<ArcherRig> = {
   type: 'archer', name: '弓兵', icon: '🏹', sub: '陸・遠距離', cost: 1,
-  hp: 70, speed: 1.5, range: 5.5, aggro: 7.5, radius: 0.35, layer: 'land', hitAir: true, hitH: 0.6,
+  hp: 70, speed: 1.5, range: 5.5, aggro: 7.5, radius: 0.35, layer: 'land', hitAir: true, ranged: true, hitH: 0.6,
   barH: 1.45, barW: 0.8, ringR: 0.45, spawnT: 0.6, deathT: 1.8, smooth: 14,
   make: makeArcher,
   base: () => ({
@@ -171,13 +171,13 @@ export const archer: UnitDef<ArcherRig> = {
   cycle: () => 1.5,
   pose, apply, post,
   aim(u, p, hd) {
-    u.aimPitch = Math.atan2(p.y - 0.55, hd);
+    u.aimPitch = Math.atan2(p.y - u.pos.y - 0.55, hd);
   },
   attack(u, _dt, ok) {
     if (u.st >= 0.8 && !u.fired.shot && ok && u.target) {
       u.fired.shot = 1;
       u.rig.bow.getWorldPosition(V);
-      fireArrowFrom(V, u.target, 14, u.pos.x);
+      fireArrowFrom(V, u.target, 14, u.pos);
     }
   },
 };

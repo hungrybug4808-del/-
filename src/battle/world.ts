@@ -7,17 +7,18 @@ import type { Building, Target, Team, Unit, UnitState } from '../units/types';
 
 export interface TeamInfo {
   color: number;
-  /** 魔王城の正面（攻撃を受ける面）の z */
-  front: number;
-  /** 出撃できる z の範囲 */
-  zone: [number, number];
+  /** 魔王城の中心の z */
+  castleZ: number;
+  /** 出撃できるのは z がこの値より自陣側 */
+  half: number;
   dir: 1 | -1;
 }
 
 export const TEAM: [TeamInfo, TeamInfo] = [
-  { color: 0x4aa3ff, front: -12.4, zone: [-11, -2], dir: 1 },
-  { color: 0xff5a5a, front: 12.4, zone: [2, 11], dir: -1 },
+  { color: 0x4aa3ff, castleZ: -32, half: -3, dir: 1 },
+  { color: 0xff5a5a, castleZ: 32, half: 3, dir: -1 },
 ];
+export const inOwnHalf = (team: Team, z: number) => (team === 0 ? z < TEAM[0].half : z > TEAM[1].half);
 
 export const units: Unit[] = [];
 export const blds: Building[] = [];
@@ -26,6 +27,11 @@ export const game = { over: false, winner: -1 as -1 | Team, endT: 0 };
 
 /** 画面に短いメッセージを出す（UI 側が差し替える） */
 export const notify = { toast: (_msg: string): void => {} };
+
+/** 高台の射程アップ：相手より 1 高いごとに +0.5、最大 +2 */
+export const HIGH_GROUND_PER = 0.5, HIGH_GROUND_MAX = 2;
+/** 近接攻撃が届く高さの差 */
+export const MELEE_DY = 1.0;
 
 export function setState(u: Unit, s: UnitState): void {
   u.state = s;
@@ -47,22 +53,53 @@ export function validTarget(u: Unit): boolean {
 export function hdist(a: { pos: THREE.Vector3 }, b: { pos: THREE.Vector3 }): number {
   return Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z);
 }
-/** 建物までの距離。魔王城は横に長いので正面の面までの距離 */
-export function bldDist(u: Unit, b: Building): number {
-  return b.kind === 'castle' ? Math.abs(u.pos.z - TEAM[b.team].front) : hdist(u, b) - b.radius;
+
+/** 建物の上で、(x,z) に一番近い点（魔王城は横に長い箱、砦は円） */
+export function bldPoint(b: Building, x: number, z: number): { x: number; z: number } {
+  if (b.box) return { x: cl(x, b.box.x0, b.box.x1), z: cl(z, b.box.z0, b.box.z1) };
+  const dx = x - b.pos.x, dz = z - b.pos.z, d = Math.hypot(dx, dz) || 1, r = Math.min(d, b.radius);
+  return { x: b.pos.x + (dx / d) * r, z: b.pos.z + (dz / d) * r };
 }
+export function bldDist(u: { pos: THREE.Vector3 }, b: Building): number {
+  const p = bldPoint(b, u.pos.x, u.pos.z);
+  return Math.hypot(u.pos.x - p.x, u.pos.z - p.z);
+}
+
+/** 狙われる点の高さ */
+function aimY(t: Target): number {
+  if (t.isBld) return t.pos.y + t.aimH;
+  return t.pos.y + (t.air ? 2.6 : t.d.hitH);
+}
+/** 狙う点。from は攻撃する側の位置（魔王城は近い面を狙う） */
+export function aimPoint(t: Target, from: { x: number; z: number }): THREE.Vector3 {
+  if (t.isBld) {
+    const p = bldPoint(t, from.x, from.z);
+    return new THREE.Vector3(p.x, aimY(t), p.z);
+  }
+  return new THREE.Vector3(t.pos.x, aimY(t), t.pos.z);
+}
+
+/** 遠距離モンスターの射程。陸の遠距離は高い所にいるほど伸びる */
+export function rangeOf(u: Unit, t: Target): number {
+  const r = u.d.range;
+  if (!u.d.ranged || u.air) return r;
+  const ty = t.isBld ? t.pos.y : t.pos.y;
+  return r + cl((u.pos.y - ty) * HIGH_GROUND_PER, 0, HIGH_GROUND_MAX);
+}
+
+/** 近接は同じ場所（陸どうし）で、段差の上下にいない相手だけ */
+export function canHit(u: Unit, t: Target): boolean {
+  if (t.isBld) return u.d.ranged || u.air || Math.abs(u.pos.y - t.pos.y) <= MELEE_DY;
+  if (t.air && !u.d.hitAir) return false;
+  if (!u.d.ranged && !u.air && !t.air && Math.abs(u.pos.y - t.pos.y) > MELEE_DY) return false;
+  return true;
+}
+
 export function inRange(u: Unit): boolean {
   const t = u.target!;
-  if (t.isBld) return bldDist(u, t) <= u.d.range + 0.1;
-  return hdist(u, t) - t.radius - u.radius * 0.5 <= u.d.range;
-}
-/** 狙う点。x は攻撃する側の x（魔王城は正面のどこを狙うか） */
-export function aimPoint(t: Target, x: number): THREE.Vector3 {
-  if (t.isBld)
-    return t.kind === 'castle'
-      ? new THREE.Vector3(cl(x, -2.5, 2.5), 1.8, TEAM[t.team].front)
-      : new THREE.Vector3(t.pos.x, 1.4, t.pos.z);
-  return new THREE.Vector3(t.pos.x, t.air ? 2.6 : t.d.hitH, t.pos.z);
+  if (!canHit(u, t)) return false;
+  if (t.isBld) return bldDist(u, t) <= rangeOf(u, t) + 0.1;
+  return hdist(u, t) - t.radius - u.radius * 0.5 <= rangeOf(u, t);
 }
 
 export function hurt(e: Unit, dmg: number): void {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { reduceMotion, rnd, vec, type V3, type XZ } from '../core/math';
 import { scene } from '../render/stage';
+import { groundY } from '../terrain/grid';
 
 const D = new THREE.Object3D();
 const TC = new THREE.Color();
@@ -11,6 +12,8 @@ interface Particle {
   l: number; L: number; s: number;
   g: number; dr: number; gr: number; fl: boolean;
   r: number; rs: number; dead: boolean;
+  /** 跳ねる・這う地面の高さ */
+  fy: number;
 }
 
 export interface ParticleOpt {
@@ -32,7 +35,7 @@ export class Pool {
     this.m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     TC.set(0xffffff);
     for (let i = 0; i < n; i++) {
-      this.q.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, l: 0, L: 1, s: 0, g: 0, dr: 0, gr: 0, fl: false, r: 0, rs: 0, dead: false });
+      this.q.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, l: 0, L: 1, s: 0, g: 0, dr: 0, gr: 0, fl: false, r: 0, rs: 0, dead: false, fy: 0 });
       D.position.set(0, -99, 0);
       D.scale.setScalar(0.0001);
       D.updateMatrix();
@@ -48,6 +51,7 @@ export class Pool {
     Object.assign(this.q[i], {
       x: p.x, y: p.y, z: p.z, vx: v.x, vy: v.y, vz: v.z, l: life, L: life, s: size, g, dr,
       gr: opt?.gr || 0, fl: opt?.fl || false, r: Math.random() * 6, rs: (Math.random() - 0.5) * 6, dead: false,
+      fy: g > 0 || opt?.fl ? groundY(p.x, p.z) : 0,
     });
     TC.setHex(color);
     this.m.setColorAt(i, TC);
@@ -75,13 +79,13 @@ export class Pool {
         q.x += q.vx * dt;
         q.y += q.vy * dt;
         q.z += q.vz * dt;
-        if (q.fl && q.y < 0.12) {
-          q.y = 0.12;
+        if (q.fl && q.y < q.fy + 0.12) {
+          q.y = q.fy + 0.12;
           q.vy = Math.abs(q.vy) * 0.15 + 0.6;
           q.vx *= 1.1;
           q.vz *= 1.1;
-        } else if (q.g > 0 && q.y < q.s * 0.5) {
-          q.y = q.s * 0.5;
+        } else if (q.g > 0 && q.y < q.fy + q.s * 0.5) {
+          q.y = q.fy + q.s * 0.5;
           q.vy *= -0.25;
           q.vx *= 0.6;
           q.vz *= 0.6;
@@ -122,12 +126,15 @@ export function stepShake(dt: number): number {
 }
 
 // ---------- よく使う演出 ----------
-export function dust(p: XZ, n: number, spread = 1, size = 1): void {
-  const cols = [0xd9cdb5, 0xc7b797, 0xb3a283];
+/** 地面の点。y を省くと地形の高さ */
+export type GroundPt = XZ & { y?: number };
+
+export function dust(p: GroundPt, n: number, spread = 1, size = 1): void {
+  const cols = [0xd9cdb5, 0xc7b797, 0xb3a283], y = (p.y ?? groundY(p.x, p.z)) + 0.08;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, s = rnd(0.4, spread * 1.6);
     solid.spawn(
-      vec(p.x + rnd(-0.2, 0.2), 0.08, p.z + rnd(-0.2, 0.2)),
+      vec(p.x + rnd(-0.2, 0.2), y, p.z + rnd(-0.2, 0.2)),
       vec(Math.cos(a) * s, rnd(0.2, 0.7), Math.sin(a) * s),
       rnd(0.8, 1.3), rnd(0.1, 0.22) * size, cols[i % 3], 0.15, 2.3,
     );
@@ -139,12 +146,12 @@ const rings: Ring[] = [];
 const RING_GEO = new THREE.RingGeometry(0.85, 1, 40);
 
 /** 地面に広がって消える輪（着地・召喚・占領など） */
-export function ring(p: XZ, color: number, max: number, dur: number): void {
+export function ring(p: GroundPt, color: number, max: number, dur: number): void {
   const m = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
     color, transparent: true, depthWrite: false, side: THREE.DoubleSide,
   }));
   m.rotation.x = -Math.PI / 2;
-  m.position.set(p.x, 0.04, p.z);
+  m.position.set(p.x, (p.y ?? groundY(p.x, p.z)) + 0.04, p.z);
   scene.add(m);
   rings.push({ m, t: 0, dur, max });
 }
