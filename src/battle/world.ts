@@ -25,6 +25,9 @@ export const blds: Building[] = [];
 
 export const game = { over: false, winner: -1 as -1 | Team, endT: 0 };
 
+/** ダメージを受けたときの追加の処理（スライムの分裂など。units.ts が差し替える） */
+export const hooks = { onHurt: (_e: Unit, _dmg: number): void => {} };
+
 /** 画面に短いメッセージを出す（UI 側が差し替える） */
 export const notify = { toast: (_msg: string): void => {} };
 
@@ -112,7 +115,7 @@ export function hurt(e: Unit, dmg: number): void {
   if (e.hp <= 0) {
     e.hp = 0;
     setState(e, 'dead');
-  }
+  } else hooks.onHurt(e, dmg);
 }
 export function hurtBld(b: Building, dmg: number): void {
   if (b.hp <= 0) return;

@@ -3,6 +3,7 @@ import { castles } from '../battle/buildings';
 import { MANA_MAX, player } from '../battle/battle';
 import { ownedVeins, VEIN_BONUS } from '../battle/veins';
 import { game, notify } from '../battle/world';
+import { flagMode } from '../battle/flags';
 import { DEF, HAND } from '../units/registry';
 import type { UnitType } from '../units/types';
 
@@ -32,16 +33,31 @@ for (const k of HAND) {
   b.type = 'button';
   b.className = 'card';
   b.innerHTML = `<span class="ic">${d.icon}</span><span><b>${d.name}</b><small>${d.sub}</small></span><span class="cost">${d.cost}</span>`;
-  b.addEventListener('click', () => { hand.selected = hand.selected === k ? null : k; });
+  b.addEventListener('click', () => {
+    hand.selected = hand.selected === k ? null : k;
+    if (hand.selected) setFlagMode(false);
+  });
   cardsEl.appendChild(b);
   cardBtns[k] = b;
 }
 
+// 旗モード：モンスターをタップして選び、地面をタップして旗を立てる。旗をタップすると外す
+const flagBtn = $<HTMLButtonElement>('flagBtn');
+export function setFlagMode(on: boolean): void {
+  flagMode.on = on;
+  if (!on) flagMode.selected.clear();
+  else {
+    hand.selected = null;
+    toast('動かすモンスターをタップ → 地面をタップで旗。旗をタップで外す', 3);
+  }
+}
+flagBtn.addEventListener('click', () => setFlagMode(!flagMode.on));
+
 let toastT = 0;
-export function toast(msg: string): void {
+export function toast(msg: string, sec = 1.4): void {
   toastEl.textContent = msg;
   toastEl.classList.add('on');
-  toastT = 1.4;
+  toastT = sec;
 }
 notify.toast = toast;
 
@@ -49,6 +65,7 @@ export function onRestart(fn: () => void): void {
   $('again').addEventListener('click', () => {
     fn();
     hand.selected = null;
+    setFlagMode(false);
     endEl.hidden = true;
   });
 }
@@ -61,6 +78,8 @@ export function updateHud(dt: number): void {
     cardBtns[k].classList.toggle('sel', hand.selected === k);
     cardBtns[k].classList.toggle('poor', m < DEF[k].cost);
   }
+  flagBtn.classList.toggle('on', flagMode.on);
+  flagBtn.textContent = flagMode.on ? (flagMode.selected.size ? `🚩 ${flagMode.selected.size}体を選択中` : '🚩 旗モード') : '🚩 旗';
   const vc = ownedVeins(0);
   veinN.textContent = vc ? '竜脈 +' + vc * VEIN_BONUS * 100 + '%' : '';
   veinN.hidden = !vc;

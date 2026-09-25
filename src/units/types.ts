@@ -1,10 +1,11 @@
 import type * as THREE from 'three';
+import type { FlowField } from '../terrain/nav';
 
 /** ポーズ（関節ごとの角度など）。毎フレーム目標値へなめらかに近づける */
 export type Pose = Record<string, number>;
 
 export type UnitType =
-  | 'goblin' | 'archer' | 'oni' | 'centaur' | 'cyclops'
+  | 'slime' | 'kingslime' | 'goblin' | 'archer' | 'oni' | 'centaur' | 'cyclops'
   | 'kappa' | 'siren' | 'kraken'
   | 'harpy' | 'griffon' | 'tengu' | 'dragon';
 export type Team = 0 | 1;
@@ -77,6 +78,8 @@ export interface Unit<R extends Rig = Rig> {
   aimPitch: number;
   inhale: number;
   prevC?: number;
+  /** 従っている旗。null なら自動で進軍 */
+  flag: Flag | null;
   /** 経路：向かっている途中の点と、再計算までの時間 */
   path: { x: number; z: number; center?: boolean }[];
   pathT: number;
@@ -88,6 +91,17 @@ export interface Unit<R extends Rig = Rig> {
 }
 
 export type Target = Unit | Building;
+
+/** プレイヤーが立てた旗。割り当てたモンスターがそこへ向かい、着いたらその場を守る */
+export interface Flag {
+  team: Team;
+  x: number;
+  y: number;
+  z: number;
+  g: THREE.Group;
+  /** 旗へ向かう距離の地図（陸・海） */
+  fields: (FlowField | undefined)[];
+}
 
 /** モンスター1種類の定義。数値・モデル・モーション・攻撃をまとめる */
 export interface UnitDef<R extends Rig = Rig> {

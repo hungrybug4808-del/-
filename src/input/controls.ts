@@ -3,7 +3,8 @@ import { cl } from '../core/math';
 import { stepShake } from '../fx/effects';
 import { camera, canvas, fog, renderer, scene, stageEl, sun } from '../render/stage';
 import { playerSpawn } from '../battle/battle';
-import { TEAM, game } from '../battle/world';
+import { TEAM, alive, game, units } from '../battle/world';
+import { flagMode, flags, plantFlag, removeFlag } from '../battle/flags';
 import { XMAX, XMIN, ZMAX, ZMIN, surfaceY } from '../terrain/grid';
 import { pickables } from '../world/terrain';
 import { hand, toast } from '../ui/hud';
@@ -89,21 +90,62 @@ canvas.addEventListener('wheel', e => {
   dist = cl(dist * (1 + e.deltaY * 0.001), 12, 80);
 }, { passive: false });
 
+/** 画面上の点 (px,py) に一番近いもの。近さは画面のピクセルで測る */
+const SP = new THREE.Vector3();
+function nearestOnScreen<T>(items: T[], at: (t: T) => THREE.Vector3, px: number, py: number, maxPx: number): T | null {
+  const r = canvas.getBoundingClientRect();
+  let best: T | null = null, bd = maxPx;
+  for (const it of items) {
+    SP.copy(at(it)).project(camera);
+    if (SP.z > 1) continue;
+    const d = Math.hypot((SP.x + 1) / 2 * r.width + r.left - px, (1 - SP.y) / 2 * r.height + r.top - py);
+    if (d < bd) { bd = d; best = it; }
+  }
+  return best;
+}
+
+function flagTap(e: PointerEvent, ground: THREE.Vector3 | null): void {
+  // 旗をタップ → 外す
+  const f = nearestOnScreen(flags.filter(f => f.team === 0), f => new THREE.Vector3(f.x, f.y + 1.4, f.z), e.clientX, e.clientY, 34);
+  if (f) { removeFlag(f); toast('旗を外しました。自動で進軍に戻ります'); return; }
+  // モンスターをタップ → 選ぶ／選ぶのをやめる
+  const u = nearestOnScreen(units.filter(u => u.team === 0 && alive(u)), u => new THREE.Vector3(u.pos.x, u.pos.y + (u.air ? u.P.rootY : u.d.hitH), u.pos.z), e.clientX, e.clientY, 40);
+  if (u) {
+    if (flagMode.selected.has(u)) flagMode.selected.delete(u);
+    else flagMode.selected.add(u);
+    return;
+  }
+  // 地面をタップ → 選んだモンスターの旗を立てる
+  if (!ground) return;
+  if (!flagMode.selected.size) { toast('先に、旗で動かすモンスターをタップして選んでください'); return; }
+  plantFlag(0, ground.x, ground.y, ground.z, [...flagMode.selected]);
+  flagMode.selected.clear();
+}
+
 function tap(e: PointerEvent): void {
+  if (flagMode.on && !game.over) {
+    flagTap(e, groundHit(e));
+    return;
+  }
   if (game.over || !hand.selected) {
     if (!game.over) toast('先に下のカードを選んでください');
     return;
   }
-  const r = canvas.getBoundingClientRect();
-  NDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-  ray.setFromCamera(NDC, camera);
-  const hit = ray.intersectObjects(pickables, false)[0];
-  if (!hit) return;
-  const res = playerSpawn(hand.selected, hit.point.x, hit.point.z, hit.point.y);
+  const p = groundHit(e);
+  if (!p) return;
+  const res = playerSpawn(hand.selected, p.x, p.z, p.y);
   if (res === 'half') toast('自陣（光る線より手前）に置いてください');
   else if (res === 'land') toast('陸のモンスターは、立てる地面に置いてください');
   else if (res === 'sea') toast('海のモンスターは、海や川の水の上に置いてください');
   else if (res === 'mana') toast('魔素が足りません');
+}
+
+/** タップした所の地面（水面を含む） */
+function groundHit(e: PointerEvent): THREE.Vector3 | null {
+  const r = canvas.getBoundingClientRect();
+  NDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(NDC, camera);
+  return ray.intersectObjects(pickables, false)[0]?.point ?? null;
 }
 
 function resize(): void {

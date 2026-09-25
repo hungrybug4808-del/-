@@ -4,6 +4,7 @@ import { DEF, HAND } from '../units/registry';
 import type { Team, UnitType } from '../units/types';
 import { forts, resetBuildings, updateBuildings } from './buildings';
 import { clearArrows, fireArrowFrom, updateArrows } from './projectiles';
+import { clearFlags, updateFlags } from './flags';
 import { clearUnits, spawnUnit, updateUnits } from './units';
 import { VEIN_BONUS, drawVeins, ownedVeins, resetVeins, updateVeins } from './veins';
 import { NX, NZ, SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, blocked, cellAt, cx, cz, passable, seaLevel, walkY } from '../terrain/grid';
@@ -122,12 +123,14 @@ export function stepBattle(dt: number, time: number): void {
     cpuThink(dt);
   } else game.endT += dt;
   updateUnits(dt);
+  updateFlags(time);
   updateArrows(dt);
   drawVeins(time);
   updateBuildings(dt);
 }
 
 export function restartBattle(): void {
+  clearFlags();
   clearUnits();
   clearArrows();
   resetBuildings();

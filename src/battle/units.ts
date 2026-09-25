@@ -3,17 +3,18 @@ import { cl, eOut, seg } from '../core/math';
 import { MAGIC, ring, sparkle } from '../fx/effects';
 import { camera, scene } from '../render/stage';
 import { DEF } from '../units/registry';
-import { RAW_KEYS, type Building, type Team, type Unit, type UnitType } from '../units/types';
+import { RAW_KEYS, type Building, type Flag, type Target, type Team, type Unit, type UnitType } from '../units/types';
 import { BAR_BG, BAR_GEO } from './bars';
 import { bldEvents } from './buildings';
+import { flagMode } from './flags';
 import { veinFor } from './veins';
 import { Bio } from '../terrain/biomes';
 import {
-  NX, NZ, XMAX, XMIN, ZMAX, ZMIN, biome, cellAt, cx, cz, groundY, passable, seaY, surfaceY, type NavLayer,
+  NX, NZ, SEA_LEVEL, XMAX, XMIN, ZMAX, ZMIN, biome, cellAt, cx, cz, groundY, passable, seaLevel, seaY, surfaceY, type NavLayer,
 } from '../terrain/grid';
 import { FlowField, canStep, findPath, walkable } from '../terrain/nav';
 import {
-  TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, canHit, game, hdist, inRange, setState, units, validTarget,
+  TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, canHit, game, hdist, hooks, inRange, notify, rangeOf, setState, units, validTarget,
 } from './world';
 
 /** 場所ごとの高さ：陸は地面、海は水面、空は下の地形（その上を飛ぶ） */
@@ -52,7 +53,7 @@ export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Uni
     isBld: false, type, team, d, rig, mat, hp: d.hp, pos: new THREE.Vector3(x, y, z), yaw, yawS: yaw,
     state: 'spawn', st: 0, life: 0, atk: null, target: null, P: d.base(), fired: {}, mem: {},
     walk: Math.random() * 6, flash: 0, fp: Math.random() * 6, tp: 0, layer, air, radius: d.radius,
-    retarget: 0, aimPitch: 0, inhale: 0, ringM, bar, fill, path: [], pathT: 0, pathGoal: null,
+    retarget: 0, aimPitch: 0, inhale: 0, ringM, bar, fill, path: [], pathT: 0, pathGoal: null, flag: null,
   };
   units.push(u);
   // 召喚：魔法陣の輪と光の粒
@@ -116,6 +117,54 @@ function fieldFor(b: Building, lay: NavLayer): FlowField {
     fields[lay].set(b, (f = new FlowField(goals, lay)));
   }
   return f;
+}
+
+/** 旗へ向かう距離の地図。旗のマスへ行けない場所（海のモンスターと陸の旗など）は、一番近い行ける所 */
+function flagField(f: Flag, lay: NavLayer): FlowField | undefined {
+  if (!(lay in f.fields)) {
+    const near: [number, number][] = [];
+    const c0x = Math.floor((f.x - XMIN) / 0.5), c0z = Math.floor((f.z - ZMIN) / 0.5);
+    for (let iz = Math.max(0, c0z - 16); iz < Math.min(NZ, c0z + 17); iz++)
+      for (let ix = Math.max(0, c0x - 16); ix < Math.min(NX, c0x + 17); ix++) {
+        const c = ix + iz * NX, d = Math.hypot(cx(ix) - f.x, cz(iz) - f.z);
+        // 海のモンスターは、海とつながった水面だけ（高台の川や湖には行けない）
+        if (d <= 8 && passable(c, lay) && (lay === 0 || seaLevel[c] === SEA_LEVEL)) near.push([c, d]);
+      }
+    const min = Math.min(...near.map(n => n[1]));
+    f.fields[lay] = near.length ? new FlowField(near.filter(n => n[1] <= min + 0.5).map(n => n[0]), lay) : undefined;
+  }
+  return f.fields[lay];
+}
+
+/** 旗に従う：向かう途中は攻撃が届く相手とだけ戦い、着いたらその場を守る */
+const GUARD_R = 4;
+function followFlag(u: Unit, f: Flag, dt: number): void {
+  const d = u.d, dFlag = Math.hypot(f.x - u.pos.x, f.z - u.pos.z), arrived = dFlag < 1.5;
+  let best: Target | null = null, bd = Infinity;
+  for (const e of units) {
+    if (e.team === u.team || !alive(e) || e.state === 'spawn' || !canHit(u, e)) continue;
+    const dd = hdist(u, e) - e.radius;
+    // 着くまでは届く相手だけ、着いたら気づく範囲（旗から離れすぎない）
+    const ok = arrived ? dd < d.aggro && Math.hypot(e.pos.x - f.x, e.pos.z - f.z) < GUARD_R + d.range : dd - u.radius * 0.5 <= rangeOf(u, e);
+    if (ok && dd < bd) { bd = dd; best = e; }
+  }
+  if (!best) for (const b of blds) if (b.team !== u.team && bldAlive(b) && canHit(u, b) && bldDist(u, b) <= rangeOf(u, b) + 0.1) { best = b; break; }
+  u.target = best;
+  if (best && inRange(u)) {
+    setState(u, 'attack');
+    u.atk = best.isBld ? 'castle' : 'unit';
+    d.startAttack?.(u);
+    return;
+  }
+  if (best && !best.isBld) {
+    if (u.state !== 'move') setState(u, 'move');
+    moveToward(u, best.pos.x, best.pos.z, dt);
+    return;
+  }
+  if (dFlag > 0.8) {
+    if (u.state !== 'move') setState(u, 'move');
+    moveToward(u, f.x, f.z, dt, u.air ? undefined : flagField(f, navOf(u)));
+  } else if (u.state !== 'idle') setState(u, 'idle');
 }
 
 /** 陸・海：地形で通れない方向へは進まず、壁に沿って滑る */
@@ -213,6 +262,12 @@ function unitLogic(u: Unit, dt: number): void {
     return;
   }
 
+  // 旗に従う。その場所から旗へたどり着けなければ（陸の奥の旗と海のモンスターなど）、旗は無視して自動で進軍
+  if (u.flag && (u.air || (flagField(u.flag, navOf(u))?.dist[cellAt(u.pos.x, u.pos.z)] ?? Infinity) < Infinity)) {
+    followFlag(u, u.flag, dt);
+    return;
+  }
+
   // 進軍・待機
   u.retarget -= dt;
   if (u.retarget <= 0 || !validTarget(u)) { chooseTarget(u); u.retarget = 0.4; }
@@ -265,8 +320,57 @@ function push2(u: Unit, x: number, z: number): void {
   if (u.air) { u.pos.x = x; u.pos.z = z; } else tryMove(u, x, z);
 }
 
+// ---- スライム：分裂と合体 ----
+/** 攻撃を受けたときに分裂する確率。分裂したスライムは 3 秒は分裂しない */
+const SPLIT_CHANCE = 0.15, SPLIT_COOL = 3, SLIME_MAX = 12;
+/** この数のスライムが集まるとキングスライムに合体する */
+export const KING_COUNT = 8;
+const KING_R = 2.5;
+
+hooks.onHurt = (e: Unit) => {
+  if (e.type !== 'slime' || e.hp < 8 || Math.random() >= SPLIT_CHANCE) return;
+  if (e.life - (e.mem.split ?? -SPLIT_COOL) < SPLIT_COOL) return;
+  if (units.filter(o => o.team === e.team && o.type === 'slime' && alive(o)).length >= SLIME_MAX) return;
+  // 体力を半分ずつ分けて、隣にもう1体
+  const a = Math.random() * Math.PI * 2;
+  let x = e.pos.x + Math.cos(a) * 0.6, z = e.pos.z + Math.sin(a) * 0.6;
+  if (!passable(cellAt(x, z))) { x = e.pos.x; z = e.pos.z; }
+  e.hp /= 2;
+  e.mem.split = e.life;
+  const n = spawnUnit('slime', e.team, x, z);
+  n.hp = e.hp;
+  n.mem.split = 0;
+  n.flag = e.flag;
+};
+
+let mergeT = 0;
+function mergeSlimes(dt: number): void {
+  mergeT -= dt;
+  if (mergeT > 0) return;
+  mergeT = 0.5;
+  for (const team of [0, 1] as const) {
+    const ss = units.filter(u => u.team === team && u.type === 'slime' && alive(u) && u.state !== 'spawn');
+    if (ss.length < KING_COUNT) continue;
+    for (const s of ss) {
+      const near = ss.filter(o => hdist(o, s) < KING_R).sort((a, b) => hdist(a, s) - hdist(b, s));
+      if (near.length < KING_COUNT) continue;
+      const group = near.slice(0, KING_COUNT);
+      let x = 0, z = 0;
+      for (const g of group) { x += g.pos.x / KING_COUNT; z += g.pos.z / KING_COUNT; sparkle({ x: g.pos.x, y: g.pos.y + 0.4, z: g.pos.z }, 8, [0x4ab8e8, 0xbfeaff, 0xffffff]); g.remove = true; }
+      if (!passable(cellAt(x, z))) { x = s.pos.x; z = s.pos.z; }
+      const king = spawnUnit('kingslime', team, x, z);
+      king.flag = s.flag;
+      ring({ x, z }, 0xf0c030, 4, 0.8);
+      sparkle({ x, y: king.pos.y + 1, z }, 40, [0xf0c030, 0xffffff, 0x4ab8e8], 1.8);
+      notify.toast(team === 0 ? 'スライムが集まって、キングスライムが誕生！' : '敵のキングスライムが誕生した！');
+      return;
+    }
+  }
+}
+
 export function updateUnits(dt: number): void {
   for (const u of units) unitLogic(u, dt);
+  mergeSlimes(dt);
   separate();
   for (let i = units.length - 1; i >= 0; i--) {
     const u = units[i];
@@ -308,7 +412,10 @@ function drawUnit(u: Unit, dt: number): void {
   d.post?.(u);
 
   u.ringM.position.set(u.pos.x, (u.air ? surfaceY(u.pos.x, u.pos.z) : u.pos.y) + 0.03, u.pos.z);
-  u.ringM.material.opacity = u.state === 'dead' ? 0.6 * (1 - seg(u.st, 0, 0.5)) : 0.6;
+  // 旗で動かすために選んでいるモンスターは、足元の輪を黄色に
+  const sel = flagMode.selected.has(u);
+  u.ringM.material.color.setHex(sel ? 0xffd34d : TEAM[u.team].color);
+  u.ringM.material.opacity = u.state === 'dead' ? 0.6 * (1 - seg(u.st, 0, 0.5)) : sel ? 0.95 : 0.6;
   u.bar.visible = u.state !== 'dead';
   u.bar.position.set(u.pos.x, u.pos.y + (u.air ? u.P.rootY + 1.8 : d.barH), u.pos.z);
   u.bar.quaternion.copy(camera.quaternion);

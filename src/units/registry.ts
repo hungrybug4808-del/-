@@ -9,13 +9,14 @@ import { kappa } from './kappa';
 import { kraken } from './kraken';
 import { oni } from './oni';
 import { siren } from './siren';
+import { kingslime, slime } from './slime';
 import { tengu } from './tengu';
 import type { UnitDef, UnitType } from './types';
 
 /** モンスターの一覧。追加するときはここに足す */
 export const DEF: Record<UnitType, UnitDef<any>> = {
-  goblin, archer, harpy, kappa, siren, griffon, oni, centaur, kraken, tengu, cyclops, dragon,
+  slime, kingslime, goblin, archer, harpy, kappa, siren, griffon, oni, centaur, kraken, tengu, cyclops, dragon,
 };
 
-/** 手札の並び順（魔素の安い順） */
-export const HAND: UnitType[] = ['goblin', 'archer', 'harpy', 'kappa', 'siren', 'griffon', 'oni', 'centaur', 'kraken', 'tengu', 'cyclops', 'dragon'];
+/** 手札の並び順（魔素の安い順）。キングスライムはスライムの合体でだけ生まれる */
+export const HAND: UnitType[] = ['slime', 'goblin', 'archer', 'harpy', 'kappa', 'siren', 'griffon', 'oni', 'centaur', 'kraken', 'tengu', 'cyclops', 'dragon'];
