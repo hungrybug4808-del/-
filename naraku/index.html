@@ -164,7 +164,7 @@ a.btn{text-decoration:none;display:inline-block}
   <h1>奈落</h1>
   <div class="sub">落 下 音 ゲ ー</div>
   <div class="press">クリック ／ キーを押して はじめる</div>
-  <div class="how">穴の奥から、拍に合わせて敵と障害物がやってくる。<br>縮む円がリングの的にぴったり重なる瞬間（±0.1秒）に、来た方向の矢印キー。<br>一度でも逃すか方向を間違えれば、その層の最初から。</div>
+  <div class="how">穴の奥から、拍に合わせて敵と障害物がやってくる。<br>縮む円がリングの的にぴったり重なる瞬間（±0.2秒）に、来た方向の矢印キー。<br>一度でも逃すか方向を間違えれば、その層の最初から。</div>
 </section>
 
 <section id="map" class="screen veil hidden">
@@ -1226,7 +1226,8 @@ function updateWorld(dt, t, speed) {
 /* =====================================================================
    7. 判定リング
    ===================================================================== */
-const RING_R = 3.0, WIN = 0.1, CAM_D = 9.5, S0 = 0.18, R_T = 0.46;
+// WIN：判定の幅（前後それぞれ0.2秒）。D_SPAWN：敵・障害物が現れる深さ。R_START：現れるときの、穴の中心からの距離
+const RING_R = 3.0, WIN = 0.2, CAM_D = 9.5, R_T = 0.46, D_SPAWN = 75, R_START = 7.6;
 const ring = new THREE.Group(); scene.add(ring);
 const ringMat = basicHDR(0xffe0a0, 0.9, { transparent: true, opacity: 0.55 });
 ring.add(new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.022, 4, 96), ringMat));
@@ -1243,11 +1244,14 @@ const laneMk = LANE_ANG.map((a, i) => {
 /* ノーツの位置：画面の上で一定の速さでリングへ近づくように、奥行きを決める。
    カメラは穴の中心軸上（z = CAM_D）。画面上の半径は RING_R / (CAM_D - z) に比例するので、
    それが時間に比例して増えるように z を逆算する（u = 0 で出現、u = 1 でリングに重なる） */
-function noteDepth(tau, lead) { const u = 1 - tau / lead, s = S0 + (1 - S0) * u; return CAM_D - CAM_D / Math.max(0.06, s); }
-const notePassed = (tau, lead) => tau < -0.3 * lead;
+/* ノーツの位置：背景（壁）と同じ速さで奥から近づき、上下左右の平面では、押す方向の外側から中心のプレイヤーへ向かってまっすぐ進む。
+   tau 秒後にリングの到着地点（半径 RING_R、z = 0）に重なる。lead はその層で現れてから届くまでの秒（= D_SPAWN / 落下の速さ） */
+function noteDepth(tau, lead) { return -tau * D_SPAWN / lead; }
+function noteRadius(tau, lead) { return Math.max(0.55, RING_R + (R_START - RING_R) * tau / lead); }
+const notePassed = (tau, lead) => noteDepth(tau, lead) > 6;
 // 奥からリングの到着地点までのガイド線
 LANE_ANG.forEach(a => {
-  const pts = []; for (let k = 0; k <= 24; k++) { const z = noteDepth(2.8 * (1 - k / 24), 2.8); pts.push(new THREE.Vector3(Math.cos(a) * RING_R, Math.sin(a) * RING_R, z)); }
+  const pts = [new THREE.Vector3(Math.cos(a) * R_START, Math.sin(a) * R_START, -D_SPAWN), new THREE.Vector3(Math.cos(a) * RING_R, Math.sin(a) * RING_R, 0)];
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: hdr(0xffe0a0, 0.7), transparent: true, opacity: 0.28, depthWrite: false }));
   ring.add(l);
 });
@@ -1543,9 +1547,9 @@ const NM = {
   }),
   obsGlow: new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(1.4, 0.35, 0.05), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }),
 };
-for (const m of Object.values(NM)) m.userData.keep = true;
+for (const m of Object.values(NM)) { m.userData.keep = true; m.fog = false; }   // 敵と障害物は霧で隠さない（遠くからでも見える）
 const OB = { root: stdMat(0x3a2616), vine: stdMat(0x1c3a22), rock: stdMat(0x4a4452), water: stdMat(0x1a3a5a, { roughness: 0.3 }), bubble: stdMat(0x0e2a4a, { roughness: 0.3 }), pillar: stdMat(0x7a6446), vortex: stdMat(0x2a1440) };
-for (const m of Object.values(OB)) m.userData.keep = true;
+for (const m of Object.values(OB)) { m.userData.keep = true; m.fog = false; }
 
 function mesh(parent, g, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1) {
   const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
@@ -1727,8 +1731,8 @@ function startStage(si) {
   const song = G.song = buildSong(si, seed);
   G.notes = song.notes.map(n => ({ ...n, judged: false, obj: null }));
   G.spawnI = 0; G.judgeI = 0; G.lastStray = null; G.chain = null; G.hitstop = 0; G.shake = 0; G.clearAt = 0;
-  G.lead = 2.8 - si * 0.1;
   applyTheme(si); P.reset(); G.speedK = 1;
+  G.lead = D_SPAWN / TH.speed;   // 背景と同じ速さで近づく
   $('fade').style.transition = 'none'; $('fade').style.opacity = 0;
   $('hudNo').textContent = `深界${S.kan}層`; $('hudName').textContent = S.name;
   $('mubou').textContent = '無傷'; $('mubou').classList.remove('hit');
@@ -1778,27 +1782,34 @@ function spawnNote(n) {
 // tau：リングに重なるまでの秒（重なったあとはマイナス）
 function placeNote(n, tau, lead) {
   const o = n.obj; if (!o) return;
-  const z = noteDepth(tau, lead);
-  if (n.type === 'large') o.position.set(0, 0, z);
-  else { const a = LANE_ANG[n.dir]; o.position.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, z); }
+  const z = noteDepth(tau, lead), r = noteRadius(tau, lead), a = LANE_ANG[n.dir];
+  if (n.type === 'large') o.position.set(Math.cos(a) * (r - RING_R), Math.sin(a) * (r - RING_R), z);   // 梁の内側の端が、外から中心へ寄ってくる
+  else {
+    o.position.set(Math.cos(a) * r, Math.sin(a) * r, z);
+    // 遠くでも見分けられるよう、遠いほど大きく描く（リングの近くでは元の大きさ）
+    const k = Math.max(1, 0.42 * (CAM_D - z) / CAM_D); o.scale.setScalar((o.userData.baseScale ??= o.scale.x) * k);
+  }
 }
 
 function judge(dir, perfMs) {
   if (G.state !== 'play') return;
   const st = songTime(perfMs);   // キーが押された瞬間の曲の時刻
   if (st < G.song.introEnd - 0.3) return;               // 前奏中は数えない
-  let cand = null;
+  // 判定の幅に入っているノーツのうち、押した方向と同じものを先に選ぶ（幅が広いので、となりのノーツと重なることがある）
+  const inWin = [];
   for (let i = G.judgeI; i < G.notes.length; i++) {
     const n = G.notes[i]; if (n.judged) continue;
     if (n.t - st > WIN) break;
-    if (Math.abs(n.t - st) <= WIN) { cand = n; break; }
+    if (Math.abs(n.t - st) <= WIN) inWin.push(n);
   }
+  const cand = inWin.find(n => n.dir === dir) || inWin[0] || null;
   if (!cand) {   // 判定の幅にノーツがないときに押しても、ミスにしない（押し直せる）
     const nx = G.notes.slice(G.judgeI).find(n => !n.judged);
     G.lastStray = nx ? st - nx.t : null;
     return;
   }
   if (cand.dir !== dir) return miss(`方向ちがい（${DIR_NAME[cand.dir]}から来たのに ${DIR_NAME[dir]}）`, cand);
+  cand.offset = st - cand.t;   // 理想の時刻とのずれ（あとでスコアに使う）
   hit(cand);
 }
 
@@ -2111,7 +2122,7 @@ $('btnEndTitle').onclick = showTitle;
    ゲームと同じプレイヤー・演出・判定後の処理（hit）をそのまま使う
    ===================================================================== */
 const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, fallK: 1, boost: 0, fog: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
-const V_LEAD = 1.4;          // 出した敵・障害物は 1.4 秒でリングに届く
+const vLead = () => D_SPAWN / (TH ? TH.speed : 20);   // ビューアでも背景と同じ速さ
 const V_CAMS = {
   game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 0, 0)],
   back: ['後ろ', new THREE.Vector3(0.8, 1.2, 4.2), new THREE.Vector3(0, 0.2, 0)],
@@ -2125,7 +2136,7 @@ function vSay(title, sub = '') { $('vNow').innerHTML = `${title}${sub ? `<small>
 function vReady() { initAudio(); if (P.st.act?.type === 'tumble') { P.reset(); G.speedK = V.fall ? 1 : 0; } }
 function vNote(type, dir, delay, extra = {}) {
   const n = { t: 0, type, dir, chain: -1, idx: 0, len: 0, fin: false, show: false, kime: false, judged: false, obj: null, ...extra };
-  if (V.spawn) { n.obj = makeNoteObj(n, STAGES[Math.min(V.layer, 6)]); scene.add(n.obj); G.live.push(n); n.tau = delay + V_LEAD; placeNote(n, n.tau, V_LEAD); }
+  if (V.spawn) { n.obj = makeNoteObj(n, STAGES[Math.min(V.layer, 6)]); scene.add(n.obj); G.live.push(n); n.lead = vLead(); n.tau = delay + n.lead; placeNote(n, n.tau, n.lead); }
   else n.tau = delay;
   V.notes.push(n);
   return n;
@@ -2135,9 +2146,9 @@ function vUpdate(dt) {
     const n = V.notes[i];
     if (n.frozen) { if (!n.obj) V.notes.splice(i, 1); continue; }
     n.tau -= dt;
-    if (n.obj) placeNote(n, n.tau, V_LEAD);
+    if (n.obj) placeNote(n, n.tau, n.lead);
     if (!n.judged && n.tau <= 0) hit(n);          // リングに重なった瞬間に「成功」として処理
-    if (notePassed(n.tau, V_LEAD) || (n.judged && !n.obj)) { removeNote(n); G.live = G.live.filter(x => x !== n); V.notes.splice(i, 1); }
+    if ((n.obj && notePassed(n.tau, n.lead)) || (n.judged && !n.obj)) { removeNote(n); G.live = G.live.filter(x => x !== n); V.notes.splice(i, 1); }
   }
   if (V.spawn) updateApproach(V.notes.filter(n => n.obj), 0.8);
 }
@@ -2542,7 +2553,7 @@ function frame(now) {
   P.update(vdt, G.vt);
   // 近づいてくる物がプレイヤーの後ろに重なるあいだは、プレイヤーを半透明にする
   let behind = false;
-  for (const n of G.live) if (n.obj && !n.judged && n.obj.position.z < -0.5) { const s = (CAM_D - 0) / (CAM_D - n.obj.position.z); if (n.type === 'large' || RING_R * s < 1.35) { behind = true; break; } }
+  for (const n of G.live) if (n.obj && !n.judged && n.obj.position.z < -0.5) { const p = n.obj.position, s = CAM_D / (CAM_D - p.z); if (n.type === 'large' || Math.hypot(p.x, p.y) * s < 1.35) { behind = true; break; } }
   playerFade(rdt, behind ? 0.35 : 1);
   for (const n of G.live) if (n.obj && !n.frozen && vdt > 0) {
     n.obj.userData.tick?.(G.vt * (n.show ? 1.2 : 1));
