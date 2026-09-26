@@ -81,6 +81,24 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 #ending .btns{opacity:0;transition:opacity 2s}
 #ending .btns.show{opacity:1}
 #ending .btn{color:#3a2c14;border-color:#8a6a2a;background:rgba(255,250,235,.5)}
+.vlink{position:fixed;right:18px;bottom:16px;z-index:6;font-size:13px;letter-spacing:.2em;color:var(--gold2);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:2px}
+.vlink:hover{border-color:var(--gold)}
+
+/* ---------- プレイヤーの動きビューア ---------- */
+#viewer{position:fixed;right:12px;top:12px;bottom:12px;width:318px;z-index:6;overflow:auto;background:var(--panel);border:1px solid var(--line);padding:16px 16px 12px;font-size:13px}
+#viewer h3{font-size:18px;letter-spacing:.2em;color:var(--gold2)}
+#viewer h4{font-size:12px;font-weight:500;color:var(--gold);letter-spacing:.15em;margin:14px 0 6px}
+#viewer .row{display:flex;flex-wrap:wrap;gap:6px}
+#viewer button{background:rgba(243,207,122,.07);border:1px solid var(--line);color:var(--txt);padding:6px 10px;font-size:13px;min-width:38px}
+#viewer button:hover{background:rgba(243,207,122,.2);border-color:var(--gold)}
+#viewer button.on{background:rgba(243,207,122,.28);border-color:var(--gold);color:var(--gold2)}
+#viewer .dirs button{font-size:17px;padding:4px 0;width:44px}
+#viewer label{display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer}
+#viewer .hint{margin-top:14px;color:var(--dim);font-size:11.5px;line-height:1.8}
+#viewer a{color:var(--gold2)}
+#vNow{position:fixed;left:24px;bottom:20px;z-index:6;font-size:22px;font-weight:700;letter-spacing:.2em;text-shadow:0 0 12px #000;pointer-events:none}
+#vNow small{display:block;font-size:12px;color:var(--dim);letter-spacing:.1em;font-weight:500}
+@media (max-width:760px){#viewer{top:auto;left:8px;right:8px;width:auto;height:46vh}#vNow{bottom:auto;top:14px}}
 @media (max-width:760px){#map{flex-direction:column;gap:10px}#mapSvg{height:56vh}#mapInfo{width:92vw}#hud .top{grid-template-columns:1fr 1fr;gap:8px}.prog{grid-column:1/3;order:3}}
 </style>
 <script type="importmap">
@@ -158,6 +176,31 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   </div>
 </section>
 
+<a class="vlink" id="vLink" href="?viewer">プレイヤーの動きを見る →</a>
+
+<aside id="viewer" class="hidden">
+  <h3>プレイヤーの動き</h3>
+  <h4>敵を斬る（刀を一閃）</h4><div class="row dirs" data-act="slash"></div>
+  <h4>小さい障害物 ── 身を翻してかわす</h4><div class="row dirs" data-act="roll"></div>
+  <h4>大きい障害物 ── 反対側の壁を蹴って跳ぶ</h4><div class="row dirs" data-act="kick"></div>
+  <h4>連撃（最後の1体はとどめ）</h4>
+  <div class="row"><button data-chain="3">3体</button><button data-chain="4">4体（一周）</button><button data-chain="show">斬り見せ場（8体＋決め）</button></div>
+  <h4>とどめ（大きく振り抜き → 衝撃波 → ヒットストップ）</h4><div class="row dirs" data-act="fin"></div>
+  <h4>そのほか</h4>
+  <div class="row"><button data-one="tumble">ゲームオーバー</button><button data-one="clear">層のクリア</button><button data-one="reset">リセット</button></div>
+  <h4>再生速度</h4><div class="row" id="vRate"></div>
+  <h4>カメラ</h4><div class="row" id="vCam"></div>
+  <label><input type="checkbox" id="vAuto"> 自動でまわす</label>
+  <h4>表示</h4>
+  <label><input type="checkbox" id="vSpawn" checked> 敵・障害物も出す</label>
+  <label><input type="checkbox" id="vRing" checked> 判定リング</label>
+  <label><input type="checkbox" id="vFall" checked> 落下（壁が流れる）</label>
+  <h4>背景の層（敵・障害物もその層のもの）</h4><div class="row" id="vLayer"></div>
+  <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：壁を蹴る<br>Space：連撃4体　R：リセット</p>
+  <p class="hint"><a href="./index.html">← ゲームへ戻る</a></p>
+</aside>
+<div id="vNow" class="hidden"></div>
+
 <div id="flash"></div>
 <div id="fade"></div>
 
@@ -168,6 +211,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* =====================================================================
    0. 小道具
@@ -1387,7 +1431,7 @@ const G = { state: 'title', si: 0, song: null, notes: [], spawnI: 0, judgeI: 0, 
 const later = (ms, fn) => G.timers.push(setTimeout(fn, ms));
 function clearTimers() { G.timers.forEach(clearTimeout); G.timers = []; }
 const SCREENS = ['title', 'map', 'over', 'clear', 'ending'];
-function show(id) { for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', id !== 'hud'); }
+function show(id) { for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', id !== 'hud'); $('vLink').classList.toggle('hidden', id !== 'title'); }
 
 function removeNote(n) { if (n.obj) { scene.remove(n.obj); n.obj = null; } }
 function clearNotes() { for (const n of G.live) removeNote(n); G.live = []; }
@@ -1709,6 +1753,7 @@ addEventListener('keydown', e => {
     case 'clear':
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nextFromClear(); } else if (e.key === 'Escape') showMap(Math.min(G.si + 1, 6));
       return;
+    case 'viewer': viewerKey(e); return;
     case 'ending':
       if ($('endBtns').classList.contains('show') && e.key === 'Escape') showMap(7);
       return;
@@ -1724,26 +1769,125 @@ $('btnEndMap').onclick = () => showMap(7);
 $('btnEndTitle').onclick = showTitle;
 
 /* =====================================================================
+   15. プレイヤーの動きビューア（?viewer）
+   ゲームと同じプレイヤー・演出・判定後の処理（hit）をそのまま使う
+   ===================================================================== */
+const V = { rate: 1, spawn: true, ring: true, fall: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
+const V_SPEED = 30, V_LEAD = 0.9;          // 出した敵・障害物は 0.9 秒でリングに届く
+const V_CAMS = {
+  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
+  back: ['後ろ', new THREE.Vector3(0.8, 1.2, 4.2), new THREE.Vector3(0, 0.2, 0)],
+  front: ['前', new THREE.Vector3(0.6, 0.6, -4.2), new THREE.Vector3(0, 0.2, 0)],
+  side: ['横', new THREE.Vector3(4.4, 0.4, 0.2), new THREE.Vector3(0, 0.2, 0)],
+  top: ['上', new THREE.Vector3(0, 4.6, 0.6), new THREE.Vector3(0, 0.2, 0)],
+  bottom: ['下', new THREE.Vector3(0, -4.6, -0.6), new THREE.Vector3(0, 0.2, 0)],
+};
+function vSay(title, sub = '') { $('vNow').innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`; }
+function vReady() { initAudio(); if (P.st.act?.type === 'tumble') { P.reset(); G.speedK = V.fall ? 1 : 0; } }
+function vNote(type, dir, delay, extra = {}) {
+  const n = { t: 0, type, dir, chain: -1, idx: 0, len: 0, fin: false, show: false, kime: false, judged: false, obj: null, ...extra };
+  if (V.spawn) { n.obj = makeNoteObj(n, STAGES[Math.min(V.layer, 6)]); scene.add(n.obj); G.live.push(n); n.z = -(delay + V_LEAD) * V_SPEED; placeNote(n, n.z); }
+  else n.z = -delay * V_SPEED;
+  V.notes.push(n);
+  return n;
+}
+function vUpdate(dt) {
+  for (let i = V.notes.length - 1; i >= 0; i--) {
+    const n = V.notes[i];
+    if (n.frozen) { if (!n.obj) V.notes.splice(i, 1); continue; }
+    n.z += V_SPEED * dt;
+    if (n.obj) placeNote(n, n.z);
+    if (!n.judged && n.z >= 0) hit(n);          // リングに重なった瞬間に「成功」として処理
+    if (n.z > 10 || (n.judged && !n.obj)) { removeNote(n); G.live = G.live.filter(x => x !== n); V.notes.splice(i, 1); }
+  }
+}
+function vClear() { for (const n of V.notes) removeNote(n); V.notes = []; G.live = []; G.chain = null; G.hitstop = 0; }
+const VACT = {
+  slash(d) { vNote('enemy', d, 0); vSay(`斬る（${DIR_NAME[d]}）`, '押した方向へ刀を一閃。光の軌跡が残る'); },
+  roll(d) { vNote('small', d, 0); vSay(`身を翻す（${DIR_NAME[d]}から${STAGES[Math.min(V.layer, 6)].obsName}）`, '小さい障害物：空中で回転してかわす'); },
+  kick(d) { vNote('large', d, 0); vSay(`壁を蹴って跳ぶ（${DIR_NAME[d]}から${STAGES[Math.min(V.layer, 6)].obsName}）`, '大きい障害物：反対側へ跳ぶ'); },
+  fin(d) { vNote('enemy', d, 0, { fin: true }); vSay(`とどめ（${DIR_NAME[d]}）`, '大きく振り抜き → 衝撃波 → ヒットストップ → 光の粒'); },
+  chain(kind) {
+    const show = kind === 'show', len = show ? 9 : +kind, id = V.cid++, d0 = Math.floor(Math.random() * 4), rot = Math.random() < 0.5 ? 1 : 3;
+    for (let k = 0; k < len; k++) vNote('enemy', (d0 + k * rot) % 4, k * 0.5, { chain: id, idx: k, len, fin: k === len - 1, kime: show && k === len - 1, show });
+    vSay(show ? '斬り見せ場（8体＋決め）' : `連撃 ${len}体`, show ? '一周ごとに光の円 → 最後は決め：ヒットストップ → 白く光る → 光の粒' : '構え直さずに連続で斬る。軌跡がつながって線になる');
+  },
+  tumble() {
+    vClear(); P.tumble(); SFX.miss(); G.shake = 0.5; vSay('ゲームオーバー', '体勢を崩し、回転しながら闇に落ちていく');
+    fxLater(3.2, () => { if (P.st.act?.type === 'tumble') { P.reset(); vSay('落下中', 'マントがはためき、体がゆっくり揺れる'); } });
+  },
+  clear() { P.flareUp(); SFX.shine(); vSay('層のクリア', 'ランプが強く光る'); },
+  reset() { vClear(); clearFX(); P.reset(); vSay('落下中', 'マントがはためき、体がゆっくり揺れる'); },
+};
+function vDo(name, arg) { vReady(); VACT[name](arg); }
+function vSetCam(key) {
+  const [, pos, tgt] = V_CAMS[key];
+  V.cam = { pos: pos.clone(), tgt: tgt.clone(), t: 0 };
+  document.querySelectorAll('#vCam button').forEach(b => b.classList.toggle('on', b.dataset.cam === key));
+}
+function vCamera(dt) {
+  if (V.cam) {
+    V.cam.t += dt; const k = 1 - Math.exp(-dt * 7);
+    camera.position.lerp(V.cam.pos, k); V.ctrl.target.lerp(V.cam.tgt, k);
+    if (V.cam.t > 1.2) V.cam = null;
+  }
+  V.ctrl.update();
+}
+function viewerKey(e) {
+  if (e.key in KEYDIR) { const d = KEYDIR[e.key]; vDo(e.shiftKey ? 'roll' : e.altKey ? 'kick' : 'slash', d); }
+  else if (e.key === ' ') { e.preventDefault(); vDo('chain', '4'); }
+  else if (e.key === 'r' || e.key === 'R') vDo('reset');
+}
+function startViewer() {
+  G.state = 'viewer'; show('none');
+  $('viewer').classList.remove('hidden'); $('vNow').classList.remove('hidden');
+  V.ctrl = new OrbitControls(camera, canvas);
+  V.ctrl.enableDamping = true; V.ctrl.minDistance = 1.2; V.ctrl.maxDistance = 30; V.ctrl.autoRotateSpeed = 2.5;
+  V.ctrl.target.set(0, 0.2, 0);
+  camera.position.set(0.8, 1.2, 4.2);
+  document.querySelectorAll('#viewer .dirs').forEach(box => {
+    [0, 1, 2, 3].forEach(d => { const b = document.createElement('button'); b.textContent = '↑→↓←'[d]; b.title = DIR_NAME[d]; b.onclick = () => vDo(box.dataset.act, d); box.appendChild(b); });
+  });
+  document.querySelectorAll('#viewer [data-chain]').forEach(b => b.onclick = () => vDo('chain', b.dataset.chain));
+  document.querySelectorAll('#viewer [data-one]').forEach(b => b.onclick = () => vDo(b.dataset.one));
+  const seg = (box, items, cur, fn) => items.forEach(([v, label]) => { const b = document.createElement('button'); b.textContent = label; b.dataset.v = v; if (v === cur) b.classList.add('on'); b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(v); }; box.appendChild(b); });
+  seg($('vRate'), [[1, '×1'], [0.5, '×0.5'], [0.25, '×0.25'], [0.1, '×0.1']], 1, v => V.rate = v);
+  seg($('vLayer'), [...STAGES.map((S, i) => [i, S.kan]), [7, '底']], 0, v => { V.layer = v; vClear(); applyTheme(v); });
+  for (const [k, [label]] of Object.entries(V_CAMS)) { const b = document.createElement('button'); b.textContent = label; b.dataset.cam = k; b.onclick = () => vSetCam(k); $('vCam').appendChild(b); }
+  $('vAuto').onchange = e => V.ctrl.autoRotate = e.target.checked;
+  $('vSpawn').onchange = e => V.spawn = e.target.checked;
+  $('vRing').onchange = e => V.ring = e.target.checked;
+  $('vFall').onchange = e => V.fall = e.target.checked;
+  P.reset(); vSay('落下中', 'マントがはためき、体がゆっくり揺れる');
+  resize();
+}
+
+/* =====================================================================
    14. メインループ
    ===================================================================== */
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h); composer.setSize(w, h); bloom.setSize(w, h);
-  camera.aspect = w / h; camera.fov = w / h < 1 ? 78 : 62; camera.updateProjectionMatrix();
+  camera.aspect = w / h; camera.fov = w / h < 1 ? 78 : 62;
+  // ビューアでは右のパネルのぶん、画面の中心を左へずらす
+  if (G.state === 'viewer' && w > 760) camera.setViewOffset(w + 330, h, 330, 0, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
   const sc = h * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
   for (const m of pointMats) m.uniforms.scale.value = sc;
 }
 addEventListener('resize', resize);
 let last = performance.now();
 function frame(now) {
-  const rdt = Math.min(0.05, (now - last) / 1000); last = now;
+  const realDt = Math.min(0.05, (now - last) / 1000); last = now;
+  const viewer = G.state === 'viewer', rdt = viewer ? realDt * V.rate : realDt;
   let vdt = rdt;
   if (G.hitstop > 0) { G.hitstop -= rdt; vdt = 0; }   // ヒットストップ：演出の時間だけ止める（ノーツは曲の時刻に合わせたまま）
   G.vt += vdt;
   for (const m of pointMats) m.uniforms.scale.value ||= 400;
   if (G.state === 'play') updatePlay();
+  if (viewer) vUpdate(vdt);
   // 落下の速さ
-  const target = G.state === 'dying' || G.state === 'over' ? 0.25 : G.state === 'clearing' ? 3.2 : G.state === 'ending' ? 0.45 : G.state === 'play' ? 1 : 0.6;
+  const target = G.state === 'dying' || G.state === 'over' ? 0.25 : G.state === 'clearing' ? 3.2 : G.state === 'ending' ? 0.45 : G.state === 'play' ? 1 : viewer ? (V.fall ? 1 : 0) : 0.6;
   G.speedK = lerp(G.speedK, target, 1 - Math.exp(-rdt * (G.state === 'ending' ? 0.25 : 2)));
   updateWorld(vdt, G.vt, (TH ? TH.speed : 18) * G.speedK);
   P.update(vdt, G.vt);
@@ -1760,19 +1904,23 @@ function frame(now) {
     if (w > 0.01) { L.glow.material.color.copy(L.warnC).multiplyScalar(0.5); L.g.scale.setScalar(1 + w * 0.5); }
     else { L.glow.material.color.copy(hdr(0xffe0a0, 1)); L.g.scale.setScalar(1 + L.press * 0.4); }
   }
-  ring.visible = P.root.visible && (G.state === 'play' || G.state === 'dying' || G.state === 'clearing');
+  ring.visible = viewer ? V.ring : P.root.visible && (G.state === 'play' || G.state === 'dying' || G.state === 'clearing');
   // 画面の揺れ
   G.shake = Math.max(0, G.shake - rdt * 1.6);
-  const s = G.shake * G.shake;
-  camera.position.set(CAM_POS.x + (Math.random() - 0.5) * s, CAM_POS.y + (Math.random() - 0.5) * s, CAM_POS.z);
-  camera.lookAt(CAM_LOOK);
+  if (viewer) vCamera(realDt);
+  else {
+    const s = G.shake * G.shake;
+    camera.position.set(CAM_POS.x + (Math.random() - 0.5) * s, CAM_POS.y + (Math.random() - 0.5) * s, CAM_POS.z);
+    camera.lookAt(CAM_LOOK);
+  }
   bloom.strength = 0.8 + P.st.flare * 1.6;
   composer.render();
   requestAnimationFrame(frame);
 }
-applyTheme(0); resize(); show('title');
+applyTheme(0); resize();
+if (QS.has('viewer')) startViewer(); else show('title');
 requestAnimationFrame(frame);
-window.__naraku = { G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
+window.__naraku = { V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
 </script>
 </body>
 </html>
