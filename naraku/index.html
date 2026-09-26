@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>奈落 — 落下音ゲー</title>
+<title>奈落</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--gold:#f3cf7a;--gold2:#ffe9b0;--panel:rgba(10,8,14,.8);--line:rgba(243,207,122,.38);--red:#ff6a3a;--txt:#efe6d2;--dim:#a39880}
+:root{color-scheme:dark;--gold:#f3cf7a;--gold2:#ffe9b0;--panel:rgba(10,8,14,.8);--line:rgba(243,207,122,.38);--red:#ff6a3a;--txt:#efe6d2;--dim:#a39880}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#050407;color:var(--txt);font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;overflow:hidden;user-select:none}
 #view{position:fixed;inset:0;width:100%;height:100%;display:block}
@@ -100,6 +100,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 .einfo{margin-top:10px;padding:10px 12px;border:1px solid var(--line);background:rgba(0,0,0,.25);line-height:1.7}
 .einfo b{font-size:17px;letter-spacing:.12em;color:var(--gold2)}
 .einfo .tag{display:inline-block;margin-left:8px;font-size:11px;padding:0 6px;border:1px solid currentColor;border-radius:2px;vertical-align:2px}
+.einfo .sw{display:inline-block;width:12px;height:12px;border:1px solid var(--line);vertical-align:-1px;margin-right:6px}
 .einfo p{color:var(--dim);font-size:12px;margin-top:4px}
 .erow{display:grid;grid-template-columns:22px 1fr 1fr 1fr;gap:4px;align-items:center;margin-bottom:4px}
 .erow span{color:var(--gold);font-size:12px;text-align:center}
@@ -186,7 +187,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   </div>
 </section>
 
-<div class="vlinks" id="vLink"><a class="vlink" href="?viewer">プレイヤーの動きを見る →</a><a class="vlink" href="?bestiary">敵・障害物を見る →</a></div>
+<div class="vlinks" id="vLink"><a class="vlink" href="#viewer">プレイヤーの動き →</a><a class="vlink" href="#bestiary">敵・障害物 →</a><a class="vlink" href="#scenery">背景 →</a></div>
 
 <aside id="viewer" class="vpanel hidden">
   <h3>プレイヤーの動き</h3>
@@ -207,7 +208,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <label><input type="checkbox" id="vFall" checked> 落下（壁が流れる）</label>
   <h4>背景の層（敵・障害物もその層のもの）</h4><div class="row" id="vLayer"></div>
   <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：壁を蹴る<br>Space：連撃4体　R：リセット</p>
-  <p class="hint"><a href="?bestiary">敵・障害物を見る →</a>　<a href="./index.html">ゲームへ戻る</a></p>
+  <p class="hint"><a href="#bestiary">敵・障害物 →</a>　<a href="#scenery">背景 →</a>　<a href="#title">ゲームへ戻る</a></p>
 </aside>
 
 <aside id="bestiary" class="vpanel hidden">
@@ -233,7 +234,26 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <h4>表示</h4>
   <label><input type="checkbox" id="eBg"> 背景（その層の穴）</label>
   <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>←→ 層を変える　↑↓ 敵・小・大を変える<br>Space 斬られる　M 見せ方を変える</p>
-  <p class="hint"><a href="?viewer">プレイヤーの動きを見る →</a>　<a href="./index.html">ゲームへ戻る</a></p>
+  <p class="hint"><a href="#viewer">プレイヤーの動き →</a>　<a href="#scenery">背景 →</a>　<a href="#title">ゲームへ戻る</a></p>
+</aside>
+
+<aside id="scenery" class="vpanel hidden">
+  <h3>背景（層の景色）</h3>
+  <div class="einfo" id="sInfo"></div>
+  <h4>層</h4><div class="row" id="sLayer"></div>
+  <h4>カメラ</h4><div class="row" id="sCam"></div>
+  <label><input type="checkbox" id="sAuto"> 自動でまわす</label>
+  <h4>落下の速さ</h4><div class="row" id="sSpeed"></div>
+  <h4>表示</h4>
+  <label><input type="checkbox" id="sFog" checked> 霧（奥ほどかすむ）</label>
+  <label><input type="checkbox" id="sPlayer" checked> プレイヤー</label>
+  <label><input type="checkbox" id="sLamp" checked> 額のランプの光</label>
+  <label><input type="checkbox" id="sRing"> 判定リング</label>
+  <label><input type="checkbox" id="sNotes"> 敵・障害物も流す</label>
+  <h4>演出</h4>
+  <div class="row"><button id="sNext">層のクリア → 次の層へ</button></div>
+  <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>←→ 層を変える　Space 次の層へ（クリアの演出）</p>
+  <p class="hint"><a href="#viewer">プレイヤーの動き →</a>　<a href="#bestiary">敵・障害物 →</a>　<a href="#title">ゲームへ戻る</a></p>
 </aside>
 <div id="eLabels"></div>
 <div id="vNow" class="hidden"></div>
@@ -1790,7 +1810,7 @@ addEventListener('keydown', e => {
     case 'clear':
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nextFromClear(); } else if (e.key === 'Escape') showMap(Math.min(G.si + 1, 6));
       return;
-    case 'viewer': (V.mode === 'enemy' ? eKey : viewerKey)(e); return;
+    case 'viewer': ({ enemy: eKey, scenery: sKey, player: viewerKey })[V.mode](e); return;
     case 'ending':
       if ($('endBtns').classList.contains('show') && e.key === 'Escape') showMap(7);
       return;
@@ -1809,7 +1829,7 @@ $('btnEndTitle').onclick = showTitle;
    15. プレイヤーの動きビューア（?viewer）
    ゲームと同じプレイヤー・演出・判定後の処理（hit）をそのまま使う
    ===================================================================== */
-const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
+const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, fallK: 1, boost: 0, fog: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
 const V_SPEED = 30, V_LEAD = 0.9;          // 出した敵・障害物は 0.9 秒でリングに届く
 const V_CAMS = {
   game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
@@ -1876,6 +1896,11 @@ function viewerKey(e) {
   else if (e.key === 'r' || e.key === 'R') vDo('reset');
 }
 const vSeg = (box, items, cur, fn) => items.forEach(([v, label]) => { const b = document.createElement('button'); b.textContent = label; b.dataset.v = v; if (v === cur) b.classList.add('on'); b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(v); }; box.appendChild(b); });
+// 開き直したときに、チェックと再生速度を初期値に戻す
+function vSync(panel, rateBox) {
+  $(panel).querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = c.defaultChecked; c.dispatchEvent(new Event('change')); });
+  $(rateBox)?.querySelector('button')?.click();
+}
 function vInit(mode, panel) {
   G.state = 'viewer'; V.mode = mode; show('none');
   $(panel).classList.remove('hidden');
@@ -1886,6 +1911,7 @@ function vInit(mode, panel) {
 }
 function startViewer() {
   vInit('player', 'viewer'); $('vNow').classList.remove('hidden');
+  if (!V.builtP) { V.builtP = true;
   document.querySelectorAll('#viewer .dirs').forEach(box => {
     [0, 1, 2, 3].forEach(d => { const b = document.createElement('button'); b.textContent = '↑→↓←'[d]; b.title = DIR_NAME[d]; b.onclick = () => vDo(box.dataset.act, d); box.appendChild(b); });
   });
@@ -1899,6 +1925,8 @@ function startViewer() {
   $('vSpawn').onchange = e => V.spawn = e.target.checked;
   $('vRing').onchange = e => V.ring = e.target.checked;
   $('vFall').onchange = e => V.fall = e.target.checked;
+  }
+  vSync('viewer', 'vRate'); document.querySelector('#vLayer button').click();
   P.reset(); vSay('落下中', 'マントがはためき、体がゆっくり揺れる');
   resize();
 }
@@ -2038,6 +2066,7 @@ function eKey(e) {
 function startBestiary() {
   vInit('enemy', 'bestiary');
   V.spawn = true; V.fall = true;
+  if (!V.builtE) { V.builtE = true;
   const list = $('eList');
   STAGES.forEach((S, i) => {
     const row = document.createElement('div'); row.className = 'erow';
@@ -2060,9 +2089,110 @@ function startBestiary() {
   $('eAct').onchange = e => E.act = e.target.checked;
   $('eAuto').onchange = e => V.ctrl.autoRotate = e.target.checked;
   $('eBg').onchange = e => { E.bg = e.target.checked; eBackground(); };
+  }
+  vSync('bestiary', 'eRate');
   resize();
-  eSetMode('spec');
+  document.querySelector('#eMode button').click();
 }
+
+/* ---------- 背景ビューア（#scenery） ---------- */
+const DECOR_NAME = { moss: '光る苔', roots: '木の根', crystals: '結晶', trees: '壁から逆さに生えた木', mist: '霧のかたまり', slabs: '岩の板', kelp: '海藻', flowers: '光る水をためた巨大な花', pillars: '石柱', lamps: '金色の灯り', gates: '古代の門（こわれた石の輪）' };
+const SPECIAL_NAME = { shafts: '地上から差す光', cliff: 'まっすぐな岩壁', falls: 'まっすぐな滝', bubbles: '立ちのぼる泡', spiral: '渦巻く光' };
+const SC = { layer: 0, notes: false, loopT: 0 };
+const S_CAMS = {
+  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
+  down: ['奥を見下ろす', new THREE.Vector3(0, 0.4, 9), new THREE.Vector3(0, 0, -40)],
+  up: ['見上げる', new THREE.Vector3(0, -0.4, -14), new THREE.Vector3(0, 0, 30)],
+  wall: ['壁に寄る', new THREE.Vector3(4.6, -3.2, 5), new THREE.Vector3(8.2, -5.2, -12)],
+  wide: ['ななめ', new THREE.Vector3(4.5, 3.5, 12), new THREE.Vector3(0, 0, -14)],
+};
+const hex = c => '#' + new THREE.Color(c).getHexString();
+function sInfo() {
+  const i = SC.layer, th = THEMES[i], S = STAGES[i];
+  const head = i === 7 ? ['深界極点', '奈落の底', '20,000 m 〜', '光の降りつもる場所（エンディング）'] : [`深界${S.kan}層`, S.name, `${fmt(S.from)} 〜 ${fmt(S.to)} m`, S.scene];
+  const parts = [...Object.keys(SPECIAL_NAME).filter(k => th[k]).map(k => SPECIAL_NAME[k]), ...th.decor.map(d => DECOR_NAME[d])];
+  $('sInfo').innerHTML = `<div style="font-size:11px;color:var(--gold);letter-spacing:.2em">${head[0]}　${head[2]}</div><b>${head[1]}</b>
+    <p>${head[3]}</p><p>見どころ：${parts.join('・')}</p>
+    <p><span class="sw" style="background:${hex(th.fog)}"></span>霧 ${hex(th.fog)}（濃さ ${th.fogD}）　<span class="sw" style="background:${hex(th.wall[1])}"></span>壁　落下 ${th.speed}/秒</p>`;
+  document.querySelectorAll('#sLayer button').forEach(b => b.classList.toggle('on', +b.dataset.v === i));
+}
+function sFog() { const d = V.fog ? TH.fogD : 0.0025; scene.fog.density = d; for (const m of pointMats) m.uniforms.fogD.value = d; }
+function sLayer(i) { SC.layer = i; V.layer = Math.min(i, 6); vClear(); applyTheme(i); sFog(); sInfo(); }
+function sSetCam(key) {
+  const [, pos, tgt] = S_CAMS[key];
+  V.cam = { pos: pos.clone(), tgt: tgt.clone(), t: 0 };
+  document.querySelectorAll('#sCam button').forEach(b => b.classList.toggle('on', b.dataset.cam === key));
+}
+function sNext() { // 層のクリア：ランプが強く光り、次の層の景色へ切り替わる
+  if (V.boost > 0) return;
+  initAudio(); P.flareUp(); SFX.shine(); V.boost = 2;
+  const fd = $('fade'); fd.style.background = '#fff8e8'; fd.style.transition = 'opacity 1.6s ease-in'; requestAnimationFrame(() => fd.style.opacity = 1);
+  later(2000, () => {
+    sLayer(SC.layer < 7 ? SC.layer + 1 : 0);
+    fd.style.transition = 'opacity 1.4s ease-out'; fd.style.opacity = 0; later(1500, () => fd.style.background = '#000');
+  });
+}
+function sUpdate(dt, realDt) {
+  V.boost = Math.max(0, V.boost - realDt);
+  if (!SC.notes || SC.layer === 7) return;
+  SC.loopT -= dt;
+  if (SC.loopT <= 0) {
+    SC.loopT = 0.9 + Math.random() * 0.6;
+    const r = Math.random(); vNote(r < 0.45 ? 'enemy' : r < 0.75 ? 'small' : 'large', Math.floor(Math.random() * 4), 0);
+  }
+}
+function sKey(e) {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); sLayer((SC.layer + (e.key === 'ArrowRight' ? 1 : 7)) % 8); }
+  else if (e.key === ' ') { e.preventDefault(); sNext(); }
+}
+function startScenery() {
+  vInit('scenery', 'scenery');
+  V.spawn = true;
+  if (!V.builtS) {
+    V.builtS = true;
+    vSeg($('sLayer'), [...STAGES.map((S, i) => [i, S.kan]), [7, '底']], 0, sLayer);
+    vSeg($('sSpeed'), [[0, '止める'], [0.3, '×0.3'], [1, '×1'], [2, '×2']], 1, v => { V.fall = v > 0; V.fallK = v || 1; });
+    for (const [k, [label]] of Object.entries(S_CAMS)) { const b = document.createElement('button'); b.textContent = label; b.dataset.cam = k; b.onclick = () => sSetCam(k); $('sCam').appendChild(b); }
+    $('sAuto').onchange = e => V.ctrl.autoRotate = e.target.checked;
+    $('sFog').onchange = e => { V.fog = e.target.checked; sFog(); };
+    $('sPlayer').onchange = e => P.root.visible = e.target.checked;
+    $('sLamp').onchange = e => P.st.lampK = e.target.checked ? 1 : 0;
+    $('sRing').onchange = e => V.ring = e.target.checked;
+    $('sNotes').onchange = e => { SC.notes = e.target.checked; if (!SC.notes) vClear(); };
+    $('sNext').onclick = sNext;
+  }
+  P.reset();
+  vSync('scenery', null); $('sSpeed').querySelector('[data-v="1"]').click();
+  resize();
+  document.querySelector('#sLayer button').click();
+  sSetCam('game');
+  camera.position.copy(CAM_POS); V.ctrl.target.set(0, 1.06, 0);
+}
+
+/* ---------- ゲームとビューアの行き来（#viewer / #bestiary / #scenery / #title） ---------- */
+function exitTools() {
+  if (!V.ctrl) return;
+  V.ctrl.dispose(); V.ctrl = null; V.cam = null;
+  for (const id of ['viewer', 'bestiary', 'scenery', 'vNow']) $(id).classList.add('hidden');
+  clearTimers(); vClear(); clearFX(); eDrop();
+  for (const l of [eKey1, eRim, eFill]) l.visible = false;
+  world.visible = motes.obj.visible = abyssGlow.visible = true; for (const g of globals) g.visible = true;
+  Object.assign(V, { rate: 1, fall: true, fallK: 1, boost: 0, ring: true, fog: true, layer: 0 });
+  $('fade').style.transition = 'none'; $('fade').style.opacity = 0; $('fade').style.background = '#000';
+  P.reset(); themeKey = -1;
+  camera.position.copy(CAM_POS); camera.lookAt(CAM_LOOK);
+  G.state = 'title'; resize();
+}
+function route() {
+  const q = ['viewer', 'bestiary', 'scenery'].find(k => QS.has(k));
+  const h = location.hash.slice(1) || q || '';
+  exitTools();
+  if (h === 'viewer') startViewer();
+  else if (h === 'bestiary') startBestiary();
+  else if (h === 'scenery') startScenery();
+  else showTitle();
+}
+addEventListener('hashchange', route);
 
 /* =====================================================================
    14. メインループ
@@ -2089,8 +2219,9 @@ function frame(now) {
   if (G.state === 'play') updatePlay();
   if (viewer) vUpdate(vdt);
   if (viewer && V.mode === 'enemy') eUpdate(vdt);
+  if (viewer && V.mode === 'scenery') sUpdate(vdt, realDt);
   // 落下の速さ
-  const target = G.state === 'dying' || G.state === 'over' ? 0.25 : G.state === 'clearing' ? 3.2 : G.state === 'ending' ? 0.45 : G.state === 'play' ? 1 : viewer ? (V.fall ? 1 : 0) : 0.6;
+  const target = G.state === 'dying' || G.state === 'over' ? 0.25 : G.state === 'clearing' ? 3.2 : G.state === 'ending' ? 0.45 : G.state === 'play' ? 1 : viewer ? (V.fall ? V.fallK * (V.boost > 0 ? 3.2 : 1) : 0) : 0.6;
   G.speedK = lerp(G.speedK, target, 1 - Math.exp(-rdt * (G.state === 'ending' ? 0.25 : 2)));
   updateWorld(vdt, G.vt, (TH ? TH.speed : 18) * G.speedK);
   P.update(vdt, G.vt);
@@ -2121,7 +2252,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 applyTheme(0); resize();
-if (QS.has('viewer')) startViewer(); else if (QS.has('bestiary')) startBestiary(); else show('title');
+route();
 requestAnimationFrame(frame);
 window.__naraku = { E, ePick, eSetMode, eCut, V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
 </script>
