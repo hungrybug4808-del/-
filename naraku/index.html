@@ -55,6 +55,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 .big{font-size:44px;font-weight:800;letter-spacing:.08em;font-variant-numeric:tabular-nums;color:var(--gold2)}
 .note{color:var(--dim);font-size:14px;line-height:1.9}
+.setpanel{text-align:left;max-width:600px}
+.setpanel h2{font-size:26px;text-align:center}
+.sh{font-size:13px;font-weight:500;color:var(--gold);letter-spacing:.2em;margin:22px 0 6px}
+.offrow{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.offrow .btn{padding:6px 12px;letter-spacing:.05em}
+.offrow input{flex:1;min-width:140px;accent-color:#f3cf7a}
+.offval{font-size:20px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;min-width:6.5em;text-align:right}
+.calib{display:flex;gap:12px;align-items:stretch;margin-top:10px}
+.calpad{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);color:var(--dim);letter-spacing:.3em;cursor:pointer;touch-action:manipulation;min-height:48px}
+.calpad.hit{background:rgba(243,207,122,.18)}
 #over h2{color:#ff9a78;text-shadow:0 0 20px rgba(255,90,40,.6)}
 #clear h2{color:var(--gold2);text-shadow:0 0 24px rgba(243,207,122,.7)}
 
@@ -142,7 +152,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <h1>奈落</h1>
   <div class="sub">落 下 音 ゲ ー</div>
   <div class="press">クリック ／ キーを押して はじめる</div>
-  <div class="how">穴の奥から、拍に合わせて敵と障害物がやってくる。<br>リングに重なる瞬間（±0.1秒）に、来た方向の矢印キー。<br>一度でも外せば、その層の最初から。</div>
+  <div class="how">穴の奥から、拍に合わせて敵と障害物がやってくる。<br>縮む円がリングの的にぴったり重なる瞬間（±0.1秒）に、来た方向の矢印キー。<br>一度でも逃すか方向を間違えれば、その層の最初から。</div>
 </section>
 
 <section id="map" class="screen veil hidden">
@@ -177,6 +187,25 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   </div>
 </section>
 
+<section id="settings" class="screen veil hidden">
+  <div class="panel setpanel">
+    <h2>設定</h2>
+    <h4 class="sh">タイミング調整</h4>
+    <p class="note">リングに重なる瞬間と、押したくなる瞬間がずれるときに使います。プラスにすると判定と表示が遅れ、マイナスにすると早まります。</p>
+    <div class="offrow">
+      <button class="btn sub" id="offMinus">−0.01</button>
+      <input type="range" id="offRange" min="-0.2" max="0.2" step="0.01" aria-label="タイミング調整（秒）">
+      <button class="btn sub" id="offPlus">＋0.01</button>
+      <span id="offVal" class="offval">+0.00 秒</span>
+    </div>
+    <h4 class="sh">自動で測る</h4>
+    <p class="note">「測る」を押すと、カチッという音が4回鳴ったあと、さらに16回鳴ります。後ろの16回に合わせて Space か矢印キーを押してください（下の四角をタップしても測れます）。</p>
+    <div class="calib"><button class="btn" id="calStart">測る</button><div id="calPad" class="calpad">ここをタップ</div></div>
+    <p class="note" id="calMsg" style="min-height:1.9em"></p>
+    <div class="btns"><button class="btn" id="setClose">もどる<small>Esc</small></button></div>
+  </div>
+</section>
+
 <section id="ending" class="screen hidden">
   <div class="line" id="end1">深度 20,000 m</div>
   <div class="line huge" id="end2">奈落の底</div>
@@ -187,7 +216,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   </div>
 </section>
 
-<div class="vlinks" id="vLink"><a class="vlink" href="#viewer">プレイヤーの動き →</a><a class="vlink" href="#bestiary">敵・障害物 →</a><a class="vlink" href="#scenery">背景 →</a></div>
+<div class="vlinks" id="vLink"><a class="vlink" href="#settings">設定 →</a><a class="vlink" href="#viewer">プレイヤーの動き →</a><a class="vlink" href="#bestiary">敵・障害物 →</a><a class="vlink" href="#scenery">背景 →</a></div>
 
 <aside id="viewer" class="vpanel hidden">
   <h3>プレイヤーの動き</h3>
@@ -324,8 +353,8 @@ const SEC_COLOR = { Q: '#6f93b0', B: '#c4a052', C: '#e0683c', K: '#fff4d8' };
    ===================================================================== */
 const SAVE_KEY = 'naraku.save.v1';
 function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && Array.isArray(s.cleared) && Array.isArray(s.best)) return s; } catch (e) { }
-  return { cleared: STAGES.map(() => false), best: STAGES.map(() => 0) };
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && Array.isArray(s.cleared) && Array.isArray(s.best)) return { offset: 0, ...s }; } catch (e) { }
+  return { cleared: STAGES.map(() => false), best: STAGES.map(() => 0), offset: 0 };
 }
 const SAVE = loadSave();
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch (e) { } }
@@ -357,7 +386,17 @@ function makeIR(sec) { // ノイズから作ったインパルス応答
   for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) { const k = i / len; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, 3.2) * (i < 60 ? i / 60 : 1); } }
   return b;
 }
-const lat = () => ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0;
+// 出力までの遅れ（処理の遅れ＋出力装置の遅れ）
+const lat = () => ctx ? (ctx.baseLatency || 0) + (ctx.outputLatency || 0) : 0;
+// 「いま耳に届いている音」の AudioContext 時刻。perfMs はキー入力や画面の時刻（performance.now と同じ基準）
+function audioNow(perfMs = performance.now()) {
+  if (!ctx) return 0;
+  if (ctx.getOutputTimestamp) {
+    const ts = ctx.getOutputTimestamp(), gap = ctx.currentTime - ts.contextTime;
+    if (ts.performanceTime > 0 && gap >= 0 && gap < 0.5) return ts.contextTime + (perfMs - ts.performanceTime) / 1000;
+  }
+  return ctx.currentTime - lat() - (performance.now() - perfMs) / 1000;
+}
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 function osc(type, f, t) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); return o; }
 function gain(v) { const g = ctx.createGain(); g.gain.value = v; return g; }
@@ -546,7 +585,8 @@ function stopSong(fade = 0.05) {
   setTimeout(() => { dry.disconnect(); rev.disconnect(); }, (fade + 0.5) * 1000);
   SCH.B = null;
 }
-const songTime = () => ctx ? ctx.currentTime - SCH.t0 - lat() : 0;
+// 曲の時刻（判定と画面の両方で使う）。タイミング調整の分だけずらす
+const songTime = (perfMs) => ctx ? audioNow(perfMs) - SCH.t0 - SAVE.offset : 0;
 
 /* =====================================================================
    4. 曲とノーツの生成（同じデータから作る）
@@ -627,7 +667,8 @@ function buildSong(si, seed) {
   }
   ons.sort((a, b) => a.t - b.t);
   const kept = [];
-  for (const o of ons) if (!kept.length || o.t - kept[kept.length - 1].t >= 0.26) kept.push(o);
+  const minGap = [0.7, 0.6, 0.3, 0.28, 0.26, 0.26, 0.26][si];   // 浅い層ほど間隔を広く（一層は4分音符より細かくしない）
+  for (const o of ons) if (!kept.length || o.t - kept[kept.length - 1].t >= minGap) kept.push(o);
 
   const notes = [];
   const mk = (t, type, dir, extra = {}) => notes.push({ t, type, dir, chain: -1, idx: 0, len: 0, fin: false, show: false, kime: false, ...extra });
@@ -1149,7 +1190,7 @@ function updateWorld(dt, t, speed) {
 /* =====================================================================
    7. 判定リング
    ===================================================================== */
-const RING_R = 2.5, R_FAR = 6.5, SPAWN_Z = 85, WIN = 0.1;
+const RING_R = 3.0, WIN = 0.1, CAM_D = 9.5, S0 = 0.18, R_T = 0.46;
 const ring = new THREE.Group(); scene.add(ring);
 const ringMat = basicHDR(0xffe0a0, 0.9, { transparent: true, opacity: 0.55 });
 ring.add(new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.022, 4, 96), ringMat));
@@ -1163,13 +1204,38 @@ const laneMk = LANE_ANG.map((a, i) => {
   ring.add(g);
   return { g, mat, glow, press: 0, warn: 0, warnC: new THREE.Color() };
 });
-function laneRadius(z) { return RING_R + (R_FAR - RING_R) * smooth(clamp(-z / 70, 0, 1)); }
-// 奥からリングまでの案内線
+/* ノーツの位置：画面の上で一定の速さでリングへ近づくように、奥行きを決める。
+   カメラは穴の中心軸上（z = CAM_D）。画面上の半径は RING_R / (CAM_D - z) に比例するので、
+   それが時間に比例して増えるように z を逆算する（u = 0 で出現、u = 1 でリングに重なる） */
+function noteDepth(tau, lead) { const u = 1 - tau / lead, s = S0 + (1 - S0) * u; return CAM_D - CAM_D / Math.max(0.06, s); }
+const notePassed = (tau, lead) => tau < -0.3 * lead;
+// 奥からリングの到着地点までのガイド線
 LANE_ANG.forEach(a => {
-  const pts = []; for (let k = 0; k <= 30; k++) { const z = -k * 3, r = laneRadius(z); pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)); }
-  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: hdr(0xffe0a0, 0.6), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const pts = []; for (let k = 0; k <= 24; k++) { const z = noteDepth(2.8 * (1 - k / 24), 2.8); pts.push(new THREE.Vector3(Math.cos(a) * RING_R, Math.sin(a) * RING_R, z)); }
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: hdr(0xffe0a0, 0.7), transparent: true, opacity: 0.28, depthWrite: false }));
   ring.add(l);
 });
+// 到着地点の的（アプローチサークルがこの円にぴったり重なった瞬間が押すタイミング）
+const targetGeo = new THREE.RingGeometry(R_T * 0.9, R_T, 64), apGeo = new THREE.RingGeometry(0.92, 1, 64);
+for (const a of LANE_ANG) { const m = new THREE.Mesh(targetGeo, new THREE.MeshBasicMaterial({ color: hdr(0xffe0a0, 0.9), transparent: true, opacity: 0.55, depthWrite: false })); m.position.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, 0.02); ring.add(m); }
+const AP = { pool: [], used: 0 };
+const AP_COL = { enemy: new THREE.Color(2.0, 1.45, 0.35), obs: new THREE.Color(2.0, 0.6, 0.12) };
+function apGet() {
+  if (AP.used >= AP.pool.length) { const m = new THREE.Mesh(apGeo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false })); m.renderOrder = 5; ring.add(m); AP.pool.push(m); }
+  return AP.pool[AP.used++];
+}
+// 縮んでいく円：items は {tau（到着までの秒）, dir, type}。apT 秒前から表示
+function updateApproach(items, apT) {
+  AP.used = 0;
+  for (const n of items) {
+    if (n.judged || n.tau <= 0 || n.tau > apT) continue;
+    const m = apGet(), a = LANE_ANG[n.dir], k = n.tau / apT;
+    m.visible = true; m.position.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, 0.03);
+    m.scale.setScalar(R_T * (1 + 2.6 * k));
+    m.material.color.copy(n.type === 'enemy' ? AP_COL.enemy : AP_COL.obs); m.material.opacity = 0.9 - 0.6 * k;
+  }
+  for (let i = AP.used; i < AP.pool.length; i++) AP.pool[i].visible = false;
+}
 
 /* =====================================================================
    8. 探窟家（ローポリ、コードで組む）
@@ -1477,17 +1543,17 @@ function updateFX(dt) {
     it.upd?.(it.obj, k);
     if (it.life <= 0) { scene.remove(it.obj); it.obj.geometry.dispose(); it.obj.material.dispose(); FX.items.splice(i, 1); }
   }
-  ringMat.opacity = Math.max(0.55, ringMat.opacity - dt * 1.2);
+  ringMat.opacity = Math.max(0.35, ringMat.opacity - dt * 1.2);
 }
 function clearFX() { for (const it of FX.items) { scene.remove(it.obj); it.obj.geometry.dispose(); it.obj.material.dispose(); } FX.items = []; FX.later = []; }
 
 /* =====================================================================
    11. ゲーム進行
    ===================================================================== */
-const G = { state: 'title', si: 0, song: null, notes: [], spawnI: 0, judgeI: 0, live: [], hitstop: 0, vt: 0, chain: null, depth: 0, shake: 0, speed: 18, speedK: 1, noteSpeed: 30, lead: 2.8, sel: 0, st: 0, clearAt: 0, lastSec: '', timers: [] };
+const G = { state: 'title', si: 0, song: null, notes: [], spawnI: 0, judgeI: 0, live: [], hitstop: 0, vt: 0, chain: null, depth: 0, shake: 0, speed: 18, speedK: 1, lead: 2.8, beatK: 0, sel: 0, st: 0, clearAt: 0, lastSec: '', timers: [] };
 const later = (ms, fn) => G.timers.push(setTimeout(fn, ms));
 function clearTimers() { G.timers.forEach(clearTimeout); G.timers = []; }
-const SCREENS = ['title', 'map', 'over', 'clear', 'ending'];
+const SCREENS = ['title', 'map', 'over', 'clear', 'ending', 'settings'];
 function show(id) { for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', id !== 'hud'); $('vLink').classList.toggle('hidden', id !== 'title'); }
 
 function removeNote(n) { if (n.obj) { scene.remove(n.obj); n.obj = null; } }
@@ -1500,8 +1566,8 @@ function startStage(si) {
   const seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;   // 毎回シードを変える
   const song = G.song = buildSong(si, seed);
   G.notes = song.notes.map(n => ({ ...n, judged: false, obj: null }));
-  G.spawnI = 0; G.judgeI = 0; G.chain = null; G.hitstop = 0; G.shake = 0; G.clearAt = 0;
-  G.lead = 2.8 - si * 0.1; G.noteSpeed = SPAWN_Z / G.lead;
+  G.spawnI = 0; G.judgeI = 0; G.lastStray = null; G.chain = null; G.hitstop = 0; G.shake = 0; G.clearAt = 0;
+  G.lead = 2.8 - si * 0.1;
   applyTheme(si); P.reset(); G.speedK = 1;
   $('fade').style.transition = 'none'; $('fade').style.opacity = 0;
   $('hudNo').textContent = `深界${S.kan}層`; $('hudName').textContent = S.name;
@@ -1547,19 +1613,19 @@ function updateHUD(st) {
 function spawnNote(n) {
   n.obj = makeNoteObj(n, STAGES[G.si]);
   scene.add(n.obj); G.live.push(n);
-  placeNote(n, -SPAWN_Z);
+  placeNote(n, G.lead, G.lead);
 }
-function placeNote(n, z) {
+// tau：リングに重なるまでの秒（重なったあとはマイナス）
+function placeNote(n, tau, lead) {
   const o = n.obj; if (!o) return;
-  if (n.type === 'large') { o.position.set(0, 0, z); }
-  else { const r = z < 0 ? laneRadius(z) : RING_R, a = LANE_ANG[n.dir]; o.position.set(Math.cos(a) * r, Math.sin(a) * r, z); }
+  const z = noteDepth(tau, lead);
+  if (n.type === 'large') o.position.set(0, 0, z);
+  else { const a = LANE_ANG[n.dir]; o.position.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, z); }
 }
 
-function curSongTime() { return songTime(); }
-
-function judge(dir) {
+function judge(dir, perfMs) {
   if (G.state !== 'play') return;
-  const st = curSongTime();
+  const st = songTime(perfMs);   // キーが押された瞬間の曲の時刻
   if (st < G.song.introEnd - 0.3) return;               // 前奏中は数えない
   let cand = null;
   for (let i = G.judgeI; i < G.notes.length; i++) {
@@ -1567,18 +1633,17 @@ function judge(dir) {
     if (n.t - st > WIN) break;
     if (Math.abs(n.t - st) <= WIN) { cand = n; break; }
   }
-  if (!cand) {
+  if (!cand) {   // 判定の幅にノーツがないときに押しても、ミスにしない（押し直せる）
     const nx = G.notes.slice(G.judgeI).find(n => !n.judged);
-    if (!nx && st > G.song.lastT) return;
-    const off = nx ? st - nx.t : 0;
-    return miss(nx && Math.abs(off) < 0.5 ? (off < 0 ? `早すぎた（${Math.round(-off * 1000)}ms）` : `遅すぎた（${Math.round(off * 1000)}ms）`) : 'なにもない拍でキーを押した', nx);
+    G.lastStray = nx ? st - nx.t : null;
+    return;
   }
   if (cand.dir !== dir) return miss(`方向ちがい（${DIR_NAME[cand.dir]}から来たのに ${DIR_NAME[dir]}）`, cand);
   hit(cand);
 }
 
 function hit(n) {
-  n.judged = true; n.hit = true;
+  n.judged = true; n.hit = true; G.lastStray = null;
   const ang = LANE_ANG[n.dir];
   laneMk[n.dir].press = 1;
   if (n.type === 'enemy') {
@@ -1627,7 +1692,7 @@ function finisher(n) {
 }
 function miss(why, n) {
   if (G.state !== 'play') return;
-  G.state = 'dying';
+  G.state = 'dying'; updateApproach([], 1);
   const S = STAGES[G.si];
   SAVE.best[G.si] = Math.max(SAVE.best[G.si], Math.round(G.depth)); persist();
   $('mubou').textContent = '被弾'; $('mubou').classList.add('hit');
@@ -1665,18 +1730,23 @@ function startClear() {
   });
 }
 
-function updatePlay() {
-  const st = G.st = curSongTime(), song = G.song;
+function updatePlay(now) {
+  const st = G.st = songTime(now), song = G.song;
   while (G.spawnI < G.notes.length && G.notes[G.spawnI].t - st < G.lead) { const n = G.notes[G.spawnI++]; if (!n.skipped) spawnNote(n); }
   if (DEBUG.auto) for (let i = G.judgeI; i < G.notes.length; i++) { const n = G.notes[i]; if (n.t > st) break; if (!n.judged) hit(n); }
   while (G.judgeI < G.notes.length && G.notes[G.judgeI].judged) G.judgeI++;
   const nx = G.notes[G.judgeI];
-  if (nx && st > nx.t + WIN) { return miss(nx.type === 'enemy' ? `${STAGES[G.si].enemyName}を斬り逃した（${DIR_NAME[nx.dir]}）` : `${STAGES[G.si].obsName}をよけられなかった（${DIR_NAME[nx.dir]}）`, nx); }
+  if (nx && st > nx.t + WIN) { const stray = G.lastStray != null && Math.abs(G.lastStray) < 0.5 ? `（押したのが ${Math.round(Math.abs(G.lastStray) * 1000)}ms ${G.lastStray < 0 ? '早すぎた' : '遅すぎた'}）` : ''; return miss((nx.type === 'enemy' ? `${STAGES[G.si].enemyName}を斬り逃した（${DIR_NAME[nx.dir]}）` : `${STAGES[G.si].obsName}をよけられなかった（${DIR_NAME[nx.dir]}）`) + stray, nx); }
   for (let i = G.live.length - 1; i >= 0; i--) {
     const n = G.live[i]; if (!n.obj || n.frozen) continue;
-    const z = (st - n.t) * G.noteSpeed; placeNote(n, z);
-    if (z > 10) { removeNote(n); G.live.splice(i, 1); }
+    const tau = n.t - st; placeNote(n, tau, G.lead);
+    if (notePassed(tau, G.lead)) { removeNote(n); G.live.splice(i, 1); }
   }
+  const ap = []; for (let i = G.judgeI; i < G.notes.length; i++) { const n = G.notes[i], tau = n.t - st; if (tau > song.bt * 2) break; ap.push({ tau, dir: n.dir, type: n.type, judged: n.judged }); }
+  updateApproach(ap, song.bt * 2);
+  // 拍に合わせてリングが脈打つ（小節の頭は強め）
+  const bp = st / song.bt, ph = bp - Math.floor(bp);
+  G.beatK = st > 0 ? Math.exp(-ph * 7) * (Math.round(bp - ph) % 4 === 0 ? 1 : 0.6) : 0;
   // レーンの予告（近づくとリングの印が色づく）
   for (const L of laneMk) L.warn = 0;
   for (let i = G.judgeI; i < G.notes.length; i++) {
@@ -1749,10 +1819,11 @@ function renderMapInfo() {
       <dl><dt>景色</dt><dd>${S.scene}</dd><dt>敵</dt><dd>${S.enemyName}</dd><dt>障害物</dt><dd>${S.obsName}</dd>
       <dt>曲</dt><dd>${S.bpm} BPM ・ ${S.inst}</dd><dt>長さ</dt><dd>約${Math.floor(S.len / 60)}分${S.len % 60 ? '半' : ''}</dd></dl>
       <div class="status" style="color:${done ? 'var(--gold2)' : ok ? 'var(--txt)' : 'var(--dim)'}">${done ? '✦ 踏破' : ok ? '未踏破' : '封印（前の層を踏破すると開く）'}　<span style="font-weight:500;color:var(--dim);letter-spacing:0">最高到達 ${fmt(SAVE.best[i])} m</span></div>
-      <div class="btns">${ok ? '<button class="btn" id="btnGo">潜る<small>Enter</small></button>' : ''}<button class="btn sub" id="btnTitle">タイトル<small>Esc</small></button></div>`;
+      <div class="btns">${ok ? '<button class="btn" id="btnGo">潜る<small>Enter</small></button>' : ''}<button class="btn sub" id="btnSet">設定</button><button class="btn sub" id="btnTitle">タイトル<small>Esc</small></button></div>`;
   }
   $('btnGo')?.addEventListener('click', enterSelected);
   $('btnTitle')?.addEventListener('click', showTitle);
+  $('btnSet')?.addEventListener('click', () => showSettings('map'));
 }
 function selectLayer(i) { G.sel = i; SFX.select(); applyTheme(i === 7 ? 7 : i); buildMap(); }
 function enterSelected() { if (G.sel === 7) { if (allCleared()) startEnding(); return; } if (unlocked(G.sel)) startStage(G.sel); }
@@ -1782,6 +1853,51 @@ function startEnding() {
   later(18000, () => { $('endBtns').classList.add('show'); $('btnEndMap').focus(); });
 }
 
+/* ---------- 設定（タイミング調整と自動測定） ---------- */
+const CAL = { on: false, t0: 0, bt: 0.6, presses: [], timer: 0 };
+function setOffset(v) {
+  SAVE.offset = Math.round(clamp(v, -0.2, 0.2) * 100) / 100; persist();
+  $('offRange').value = SAVE.offset;
+  $('offVal').textContent = `${SAVE.offset >= 0 ? '+' : '−'}${Math.abs(SAVE.offset).toFixed(2)} 秒`;
+}
+function showSettings(from) {
+  G.setFrom = from; G.state = 'settings'; show('settings'); setOffset(SAVE.offset || 0); $('calMsg').textContent = ''; $('setClose').focus();
+}
+function closeSettings() {
+  clearTimeout(CAL.timer); CAL.on = false;
+  if (G.setFrom === 'map') showMap(G.sel);
+  else if (location.hash === '#settings') location.hash = 'title'; else showTitle();
+}
+function calStart() {
+  initAudio(); clearTimeout(CAL.timer);
+  CAL.on = true; CAL.presses = []; CAL.t0 = ctx.currentTime + 0.6;
+  for (let k = 0; k < 20; k++) DRUM.wood(sfxBus, CAL.t0 + k * CAL.bt, k < 4 ? 0.45 : 0.8, k % 4 ? 1100 : 1500);
+  $('calMsg').textContent = '最初の4回は聞くだけ。そのあとの16回に合わせて押してください';
+  CAL.timer = setTimeout(calEnd, (0.6 + 20 * CAL.bt + 0.3) * 1000);
+}
+function calPress(perfMs) {
+  if (!CAL.on) return;
+  const pad = $('calPad'); pad.classList.add('hit'); setTimeout(() => pad.classList.remove('hit'), 90);
+  const t = audioNow(perfMs), k = Math.round((t - CAL.t0) / CAL.bt);   // 耳に届いた拍と比べる
+  if (k < 4 || k > 19) return;
+  CAL.presses.push(t - (CAL.t0 + k * CAL.bt));
+  $('calMsg').textContent = `${CAL.presses.length} 回`;
+}
+function calEnd() {
+  CAL.on = false;
+  const d = CAL.presses.filter(x => Math.abs(x) < 0.25).sort((a, b) => a - b);
+  if (d.length < 8) { $('calMsg').textContent = `押せたのが ${d.length} 回だったので、もう一度測ってください（8回以上必要）`; return; }
+  const med = d[d.length >> 1];
+  setOffset(med);
+  $('calMsg').textContent = `ずれ（中央値）${med >= 0 ? '+' : '−'}${Math.abs(med * 1000).toFixed(0)}ms → タイミング調整を ${SAVE.offset >= 0 ? '+' : '−'}${Math.abs(SAVE.offset).toFixed(2)} 秒にしました`;
+}
+$('offRange').oninput = e => setOffset(+e.target.value);
+$('offMinus').onclick = () => setOffset((SAVE.offset || 0) - 0.01);
+$('offPlus').onclick = () => setOffset((SAVE.offset || 0) + 0.01);
+$('calStart').onclick = calStart;
+$('calPad').addEventListener('pointerdown', e => { e.preventDefault(); calPress(e.timeStamp); });
+$('setClose').onclick = closeSettings;
+
 /* =====================================================================
    13. 入力
    ===================================================================== */
@@ -1792,7 +1908,7 @@ addEventListener('keydown', e => {
   switch (G.state) {
     case 'title': initAudio(); SFX.select(); showMap(); return;
     case 'play':
-      if (e.key in KEYDIR) judge(KEYDIR[e.key]);
+      if (e.key in KEYDIR) judge(KEYDIR[e.key], e.timeStamp);
       else if (e.key === 'Escape') showMap(G.si);
       return;
     case 'map': {
@@ -1809,6 +1925,10 @@ addEventListener('keydown', e => {
       return;
     case 'clear':
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nextFromClear(); } else if (e.key === 'Escape') showMap(Math.min(G.si + 1, 6));
+      return;
+    case 'settings':
+      if (e.key === 'Escape') closeSettings();
+      else if (CAL.on && (e.key === ' ' || e.key in KEYDIR)) { e.preventDefault(); calPress(e.timeStamp); }
       return;
     case 'viewer': ({ enemy: eKey, scenery: sKey, player: viewerKey })[V.mode](e); return;
     case 'ending':
@@ -1830,7 +1950,7 @@ $('btnEndTitle').onclick = showTitle;
    ゲームと同じプレイヤー・演出・判定後の処理（hit）をそのまま使う
    ===================================================================== */
 const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, fallK: 1, boost: 0, fog: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
-const V_SPEED = 30, V_LEAD = 0.9;          // 出した敵・障害物は 0.9 秒でリングに届く
+const V_LEAD = 1.4;          // 出した敵・障害物は 1.4 秒でリングに届く
 const V_CAMS = {
   game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
   back: ['後ろ', new THREE.Vector3(0.8, 1.2, 4.2), new THREE.Vector3(0, 0.2, 0)],
@@ -1843,8 +1963,8 @@ function vSay(title, sub = '') { $('vNow').innerHTML = `${title}${sub ? `<small>
 function vReady() { initAudio(); if (P.st.act?.type === 'tumble') { P.reset(); G.speedK = V.fall ? 1 : 0; } }
 function vNote(type, dir, delay, extra = {}) {
   const n = { t: 0, type, dir, chain: -1, idx: 0, len: 0, fin: false, show: false, kime: false, judged: false, obj: null, ...extra };
-  if (V.spawn) { n.obj = makeNoteObj(n, STAGES[Math.min(V.layer, 6)]); scene.add(n.obj); G.live.push(n); n.z = -(delay + V_LEAD) * V_SPEED; placeNote(n, n.z); }
-  else n.z = -delay * V_SPEED;
+  if (V.spawn) { n.obj = makeNoteObj(n, STAGES[Math.min(V.layer, 6)]); scene.add(n.obj); G.live.push(n); n.tau = delay + V_LEAD; placeNote(n, n.tau, V_LEAD); }
+  else n.tau = delay;
   V.notes.push(n);
   return n;
 }
@@ -1852,11 +1972,12 @@ function vUpdate(dt) {
   for (let i = V.notes.length - 1; i >= 0; i--) {
     const n = V.notes[i];
     if (n.frozen) { if (!n.obj) V.notes.splice(i, 1); continue; }
-    n.z += V_SPEED * dt;
-    if (n.obj) placeNote(n, n.z);
-    if (!n.judged && n.z >= 0) hit(n);          // リングに重なった瞬間に「成功」として処理
-    if (n.z > 10 || (n.judged && !n.obj)) { removeNote(n); G.live = G.live.filter(x => x !== n); V.notes.splice(i, 1); }
+    n.tau -= dt;
+    if (n.obj) placeNote(n, n.tau, V_LEAD);
+    if (!n.judged && n.tau <= 0) hit(n);          // リングに重なった瞬間に「成功」として処理
+    if (notePassed(n.tau, V_LEAD) || (n.judged && !n.obj)) { removeNote(n); G.live = G.live.filter(x => x !== n); V.notes.splice(i, 1); }
   }
+  if (V.spawn) updateApproach(V.notes.filter(n => n.obj), 0.8);
 }
 function vClear() { for (const n of V.notes) removeNote(n); V.notes = []; G.live = []; G.chain = null; G.hitstop = 0; }
 const VACT = {
@@ -2190,6 +2311,7 @@ function route() {
   if (h === 'viewer') startViewer();
   else if (h === 'bestiary') startBestiary();
   else if (h === 'scenery') startScenery();
+  else if (h === 'settings') { showTitle(); showSettings('title'); }
   else showTitle();
 }
 addEventListener('hashchange', route);
@@ -2216,7 +2338,7 @@ function frame(now) {
   if (G.hitstop > 0) { G.hitstop -= rdt; vdt = 0; }   // ヒットストップ：演出の時間だけ止める（ノーツは曲の時刻に合わせたまま）
   G.vt += vdt;
   for (const m of pointMats) m.uniforms.scale.value ||= 400;
-  if (G.state === 'play') updatePlay();
+  if (G.state === 'play') updatePlay(now);
   if (viewer) vUpdate(vdt);
   if (viewer && V.mode === 'enemy') eUpdate(vdt);
   if (viewer && V.mode === 'scenery') sUpdate(vdt, realDt);
@@ -2231,6 +2353,8 @@ function frame(now) {
     if (n.type === 'large') n.obj.rotation.z = LANE_ANG[n.dir] + Math.sin(G.vt * 2 + n.t) * 0.04;
   }
   sparks.update(vdt); updateFX(vdt);
+  if (G.state === 'play') { ring.scale.setScalar(1 + G.beatK * 0.03); ringMat.opacity = Math.max(ringMat.opacity, 0.35 + 0.6 * G.beatK); }
+  else { ring.scale.setScalar(1); if (!viewer) updateApproach([], 1); }
   for (const L of laneMk) {
     L.press = Math.max(0, L.press - rdt * 4);
     const w = G.state === 'play' ? L.warn : 0;
