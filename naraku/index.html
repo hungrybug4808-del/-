@@ -17,9 +17,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;pointer-events:none}
-#hud .top{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:minmax(170px,1fr) minmax(240px,2.2fr) minmax(150px,1fr);gap:26px;align-items:center;padding:14px 24px 26px;background:linear-gradient(rgba(4,3,7,.8),rgba(4,3,7,0))}
+/* 画面の中央の縦の帯（上と下のレーン）にかからないよう、表示は四隅に置く */
+.hudL{position:absolute;left:20px;top:16px;width:min(270px,27vw);display:flex;flex-direction:column;gap:10px}
+.hudR{position:absolute;right:20px;top:16px}
 .layerNo{font-size:12px;color:var(--gold);letter-spacing:.35em}
-.layerName{font-size:22px;font-weight:700;letter-spacing:.14em;text-shadow:0 0 12px #000}
+.layerName{font-size:20px;font-weight:700;letter-spacing:.14em;text-shadow:0 0 12px #000}
 .prog{position:relative;height:42px}
 #progLabel{position:absolute;left:0;right:0;top:0;text-align:center;font-size:12px;letter-spacing:.4em;color:var(--gold2)}
 #progSegs{position:absolute;left:0;right:0;top:22px;height:8px;display:flex;gap:2px}
@@ -29,12 +31,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 .depth{text-align:right;font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 0 12px #000}
 .depth .lbl{display:block;font-size:11px;color:var(--gold);letter-spacing:.35em;font-weight:500}
 .depth small{font-size:14px;margin-left:4px;color:var(--dim)}
-#mubou{position:absolute;left:24px;top:86px;padding:5px 16px 5px 20px;border:1px solid var(--gold);color:var(--gold2);font-weight:800;letter-spacing:.5em;font-size:15px;background:rgba(24,18,6,.55);box-shadow:inset 0 0 14px rgba(243,207,122,.3),0 0 12px rgba(243,207,122,.25)}
+#mubou{align-self:flex-start;padding:4px 14px 4px 18px;border:1px solid var(--gold);color:var(--gold2);font-weight:800;letter-spacing:.5em;font-size:15px;background:rgba(24,18,6,.55);box-shadow:inset 0 0 14px rgba(243,207,122,.3),0 0 12px rgba(243,207,122,.25)}
 #mubou.hit{border-color:var(--red);color:#ffb39a;box-shadow:0 0 22px rgba(255,90,40,.7)}
-#legend{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;gap:28px;align-items:center;font-size:14px;background:var(--panel);padding:10px 22px;border:1px solid var(--line);transition:opacity 1s;white-space:nowrap}
+#legend{position:absolute;bottom:20px;left:20px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.5;background:var(--panel);padding:10px 16px;border:1px solid var(--line);transition:opacity 1s;max-width:27vw}
 #legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
 .keys{letter-spacing:.2em;color:var(--gold2)}
-#count{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);font-size:64px;font-weight:800;color:var(--gold2);text-shadow:0 0 24px rgba(243,207,122,.8);opacity:0;transition:opacity .15s}
+#count{position:absolute;left:12%;top:50%;transform:translate(-50%,-50%);font-size:64px;font-weight:800;color:var(--gold2);text-shadow:0 0 24px rgba(243,207,122,.8);opacity:0;transition:opacity .15s}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:4}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:3}
 
@@ -120,7 +122,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 #vNow{position:fixed;left:24px;bottom:20px;z-index:6;font-size:22px;font-weight:700;letter-spacing:.2em;text-shadow:0 0 12px #000;pointer-events:none}
 #vNow small{display:block;font-size:12px;color:var(--dim);letter-spacing:.1em;font-weight:500}
 @media (max-width:760px){.vpanel{top:auto;left:8px;right:8px;width:auto;height:46vh}#vNow{bottom:auto;top:14px}}
-@media (max-width:760px){#map{flex-direction:column;gap:10px}#mapSvg{height:56vh}#mapInfo{width:92vw}#hud .top{grid-template-columns:1fr 1fr;gap:8px}.prog{grid-column:1/3;order:3}}
+@media (max-width:760px){#map{flex-direction:column;gap:10px}#mapSvg{height:56vh}#mapInfo{width:92vw}.hudL{width:40vw}#legend{max-width:40vw;font-size:11px}}
 </style>
 <script type="importmap">
 {"imports":{
@@ -133,18 +135,18 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 <canvas id="view"></canvas>
 
 <div id="hud" class="hidden">
-  <div class="top">
+  <div class="hudL">
     <div><div class="layerNo" id="hudNo">深界一層</div><div class="layerName" id="hudName">縁の苔穴</div></div>
     <div class="prog"><div id="progLabel">静か</div><div id="progSegs"></div><div id="progHead"></div></div>
-    <div class="depth"><span class="lbl">深度</span><span id="hudDepth">0</span><small>m</small></div>
+    <div id="mubou">無傷</div>
   </div>
-  <div id="mubou">無傷</div>
+  <div class="hudR depth"><span class="lbl">深度</span><span id="hudDepth">0</span><small>m</small></div>
   <div id="count"></div>
   <div id="legend">
     <span class="keys">↑ → ↓ ←</span>
     <span><i style="background:#ffc840;box-shadow:0 0 8px #ffc840"></i>金の目 ＝ 斬る</span>
     <span><i style="background:#ff6a2a;box-shadow:0 0 8px #ff6a2a"></i>赤橙のふち ＝ よける</span>
-    <span style="color:var(--dim)">リングに重なる瞬間に、来た方向のキー</span>
+    <span style="color:var(--dim)">縮む円が的に重なる瞬間に<br>来た方向のキー</span>
   </div>
 </div>
 
@@ -829,7 +831,8 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x101010, 0.02);
 scene.background = new THREE.Color(0x101010);
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 420);
-const CAM_POS = new THREE.Vector3(0, 1.5, 7.2), CAM_LOOK = new THREE.Vector3(0, -0.4, -24);
+// カメラは穴の中心軸の真上から、まっすぐ下を見下ろす（4方向が同じ距離・同じ見え方になる）
+const CAM_POS = new THREE.Vector3(0, 0, 9.5), CAM_LOOK = new THREE.Vector3(0, 0, -30);
 camera.position.copy(CAM_POS); camera.lookAt(CAM_LOOK);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -1281,13 +1284,12 @@ const P = (() => {
   const cloak = new THREE.Mesh(cg, cloakM); cloak.position.set(0, 0.34, 0.2); body.add(cloak);
   const base = cg.attributes.position.array.slice();
 
-  root.scale.setScalar(1.45);
-  root.rotation.x = -0.28; // やや前傾で穴の奥をのぞく
+  root.scale.setScalar(1.15);
   const st = { act: null, sword: 0, swingSign: 1, flare: 0, lampK: 1, hidden: false };
   function setAct(type, dir, dur, extra = {}) { st.act = { type, dir, t: 0, dur, ...extra }; }
   return {
     root, body, lamp, spot, lampGlow, st,
-    reset() { st.act = null; st.sword = 0; st.flare = 0; st.lampK = 1; root.position.set(0, 0, 0); root.rotation.set(-0.28, 0, 0); body.rotation.set(0, 0, 0); body.position.set(0, 0, 0); swordPiv.visible = false; root.visible = true; },
+    reset() { st.act = null; st.sword = 0; st.flare = 0; st.lampK = 1; root.position.set(0, 0, 0); root.rotation.set(0, 0, 0); body.rotation.set(0, 0, 0); body.position.set(0, 0, 0); swordPiv.visible = false; root.visible = true; },
     slash(dir, big = false) {
       st.swingSign = -st.swingSign;
       setAct(big ? 'big' : 'slash', dir, big ? 0.2 : 0.11, { a0: LANE_ANG[dir] + st.swingSign * (big ? 2.9 : 1.35), a1: LANE_ANG[dir] - st.swingSign * (big ? 2.9 : 1.35) });
@@ -1348,6 +1350,14 @@ const P = (() => {
     },
   };
 })();
+
+// プレイヤー全体の透明度（重なるときだけ半透明）
+const PF = { k: 1, mats: null };
+function playerFade(dt, target) {
+  if (!PF.mats) { PF.mats = new Set(); P.root.traverse(o => { if (o.material && !o.isSprite && !o.isLight) PF.mats.add(o.material); }); }
+  const k = PF.k = PF.k + (target - PF.k) * (1 - Math.exp(-dt * 12));
+  for (const m of PF.mats) { const tr = k < 0.99; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = k; m.depthWrite = !tr; }
+}
 
 /* =====================================================================
    9. 敵と障害物（ローポリ、コードで組む）
@@ -1952,7 +1962,7 @@ $('btnEndTitle').onclick = showTitle;
 const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, fallK: 1, boost: 0, fog: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
 const V_LEAD = 1.4;          // 出した敵・障害物は 1.4 秒でリングに届く
 const V_CAMS = {
-  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
+  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 0, 0)],
   back: ['後ろ', new THREE.Vector3(0.8, 1.2, 4.2), new THREE.Vector3(0, 0.2, 0)],
   front: ['前', new THREE.Vector3(0.6, 0.6, -4.2), new THREE.Vector3(0, 0.2, 0)],
   side: ['横', new THREE.Vector3(4.4, 0.4, 0.2), new THREE.Vector3(0, 0.2, 0)],
@@ -2221,7 +2231,7 @@ const DECOR_NAME = { moss: '光る苔', roots: '木の根', crystals: '結晶', 
 const SPECIAL_NAME = { shafts: '地上から差す光', cliff: 'まっすぐな岩壁', falls: 'まっすぐな滝', bubbles: '立ちのぼる泡', spiral: '渦巻く光' };
 const SC = { layer: 0, notes: false, loopT: 0 };
 const S_CAMS = {
-  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
+  game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 0, 0)],
   down: ['奥を見下ろす', new THREE.Vector3(0, 0.4, 9), new THREE.Vector3(0, 0, -40)],
   up: ['見上げる', new THREE.Vector3(0, -0.4, -14), new THREE.Vector3(0, 0, 30)],
   wall: ['壁に寄る', new THREE.Vector3(4.6, -3.2, 5), new THREE.Vector3(8.2, -5.2, -12)],
@@ -2287,7 +2297,7 @@ function startScenery() {
   resize();
   document.querySelector('#sLayer button').click();
   sSetCam('game');
-  camera.position.copy(CAM_POS); V.ctrl.target.set(0, 1.06, 0);
+  camera.position.copy(CAM_POS); V.ctrl.target.set(0, 0, 0);
 }
 
 /* ---------- ゲームとビューアの行き来（#viewer / #bestiary / #scenery / #title） ---------- */
@@ -2347,6 +2357,10 @@ function frame(now) {
   G.speedK = lerp(G.speedK, target, 1 - Math.exp(-rdt * (G.state === 'ending' ? 0.25 : 2)));
   updateWorld(vdt, G.vt, (TH ? TH.speed : 18) * G.speedK);
   P.update(vdt, G.vt);
+  // 近づいてくる物がプレイヤーの後ろに重なるあいだは、プレイヤーを半透明にする
+  let behind = false;
+  for (const n of G.live) if (n.obj && !n.judged && n.obj.position.z < -0.5) { const s = (CAM_D - 0) / (CAM_D - n.obj.position.z); if (n.type === 'large' || RING_R * s < 1.35) { behind = true; break; } }
+  playerFade(rdt, behind ? 0.35 : 1);
   for (const n of G.live) if (n.obj && !n.frozen && vdt > 0) {
     n.obj.userData.tick?.(G.vt * (n.show ? 1.2 : 1));
     const sp = n.obj.userData.spin; if (sp) { n.obj.rotation.x += sp.x * vdt; n.obj.rotation.y += sp.y * vdt; }
