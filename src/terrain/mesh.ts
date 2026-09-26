@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { hash } from '../core/math';
 import { SIDE_COLOR, TOP_COLOR, waterColor, type Bio } from './biomes';
-import { B, CELL, NX, NY, NZ, X0, Y0, Z0, biome, colOf, getB, isSolid, yTop } from './grid';
+import { B, CELL, NX, NY, NZ, X0, Y0, Z0, XMAX, XMIN, ZMAX, ZMIN, biome, colOf, getB, isSolid, yTop } from './grid';
+import { outerCol } from './generate';
+import type { Col } from './gen-util';
 
 // ブロックを、外から見える面だけの1つのメッシュにまとめる。
 // 角の陰（アンビエントオクルージョン）を頂点色に入れて、ブロックの段差を見やすくする。
@@ -82,14 +84,17 @@ function pick(list: number[], x: number, y: number, z: number): number {
   return list[h > 0.8 ? Math.min(2, list.length - 1) : h > 0.45 ? Math.min(1, list.length - 1) : 0];
 }
 
-/** マップの外は、海面より下なら埋まっている扱い（海の断面を見せない） */
+/** マップの外は、遠景の地形（outerCol）の高さまで埋まっている扱い */
+function outside(ix: number, iz: number): Col {
+  return outerCol(X0 + (ix + 0.5) * CELL, Z0 + (iz + 0.5) * CELL);
+}
 function solidAt(ix: number, iy: number, iz: number): boolean {
   if (iy < 0) return true;
-  if (ix < 0 || ix >= NX || iz < 0 || iz >= NZ) return yTop(iy) <= 0;
+  if (ix < 0 || ix >= NX || iz < 0 || iz >= NZ) return yTop(iy) <= outside(ix, iz).h;
   return isSolid(getB(ix, iy, iz));
 }
 function waterOrSolid(ix: number, iy: number, iz: number): boolean {
-  if (ix < 0 || ix >= NX || iz < 0 || iz >= NZ) return yTop(iy) <= 0;
+  if (ix < 0 || ix >= NX || iz < 0 || iz >= NZ) { const c = outside(ix, iz); return yTop(iy) <= Math.max(c.h, c.water ?? -99); }
   return getB(ix, iy, iz) !== B.AIR;
 }
 
@@ -130,6 +135,60 @@ export function buildChunk(cx0: number, cz0: number): { land: THREE.BufferGeomet
       }
     }
   return { land: land.build(), water: water.build() };
+}
+
+// ---- マップの外の遠景 ----
+/** 遠景の帯：マス s の大きさで、マップのふちから r まで（外ほど粗く） */
+const BANDS = [{ s: 1, r: 30 }, { s: 2, r: 70 }, { s: 4, r: 180 }];
+
+/** 遠景の地形。動きには関わらず、見た目だけ（粗いブロックの高さの面と、水面） */
+export function buildOuter(): { land: THREE.BufferGeometry[]; water: THREE.BufferGeometry[] } {
+  const out = { land: [] as THREE.BufferGeometry[], water: [] as THREE.BufferGeometry[] };
+  const C = new THREE.Color();
+  let inner = { x0: XMIN, x1: XMAX, z0: ZMIN, z1: ZMAX }, prevS = 1;
+  for (const { s, r } of BANDS) {
+    const rect = { x0: XMIN - r, x1: XMAX + r, z0: ZMIN - r, z1: ZMAX + r };
+    const land = new FaceBuilder(), water = new FaceBuilder();
+    for (let z = rect.z0; z < rect.z1; z += s)
+      for (let x = rect.x0; x < rect.x1; x += s) {
+        if (x >= inner.x0 && x < inner.x1 && z >= inner.z0 && z < inner.z1) continue;
+        const c = outerCol(x, z, s), h = c.h;
+        land.face(3, x, h - s, z, s, pick(TOP_COLOR[c.mat], x, 0, z), null);
+        // 側面：隣が低い所だけ（地層の色の縞で）
+        for (let f = 0; f < 6; f++) {
+          if (f === 2 || f === 3) continue;
+          const d = FACES[f].d, nx = x + d[0] * s, nz = z + d[2] * s;
+          const inIn = nx >= inner.x0 && nx < inner.x1 && nz >= inner.z0 && nz < inner.z1;
+          const nh = outerCol(nx, nz, inIn ? prevS : s).h;
+          // 同じ種類のブロックが続く所は1枚にまとめる
+          const seg = s >= 4 ? 1 : CELL;
+          let y0 = Math.min(h, Math.max(nh, h - 12)), run: B | -1 = -1, runY = y0;
+          for (let y = y0; y <= h; y += seg) {
+            const b: B | -1 = y >= h ? -1 : y + seg >= h ? c.mat : c.strata ? c.strata(y + seg) : h - y <= 1.5 ? c.sub : B.STONE;
+            if (b === run) continue;
+            if (run !== -1) {
+              const list = y >= h && run !== B.GRASS && run !== B.MEADOW ? TOP_COLOR[run] : SIDE_COLOR[run] ?? TOP_COLOR[run];
+              const n = land.pos.length / 3;
+              land.face(f, x, runY, z, s, pick(list, x, runY * 2 + f, z), null);
+              // 立方体の面を、runY〜y の高さに縮める
+              for (let k = n; k < n + 4; k++) { const i = k * 3 + 1; land.pos[i] = land.pos[i] > runY + 1e-6 ? y : runY; }
+            }
+            run = b;
+            runY = y;
+          }
+        }
+        if (c.water !== undefined && c.water > h) {
+          C.setHex(waterColor(c.bio));
+          water.face(3, x, c.water - s - 0.08, z, s, C.getHex(), null, 0, true);
+        }
+      }
+    const lg = land.build(), wg = water.build();
+    if (lg) out.land.push(lg);
+    if (wg) out.water.push(wg);
+    inner = rect;
+    prevS = s;
+  }
+  return out;
 }
 
 // ---- 飾り（木・岩・草花など）。0.25 の細かいボクセルで、動きには影響しない ----

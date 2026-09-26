@@ -1,66 +1,106 @@
 import { Bio } from '../biomes';
 import { B } from '../grid';
-import { type Col, backSea, castleYard, fbm, q, vn } from '../gen-util';
+import { type Col, MOAT, MOAT_X, castleYard, inMap, moat, moatRim, q, smooth, vn } from '../gen-util';
 import type { MapDef } from './types';
 
-// 霊峰の国（寒冷）：真ん中に大きな雪山。
-// 陸の道は、山の西をまわる雪原・山を貫く氷の洞窟・山の東をまわる雪原の3本。
-// 陸の竜脈は洞窟の奥の広間、空の竜脈は東の凍った湖の上の浮島、海の竜脈は西の海。
-// 東の雪原の外側は一段高い雪の段丘（高台）で、陣地の近くの坂から上がれる。
+// 霊峰の国（寒冷・雪）：雪山の連なる造山帯。まわりは高い峰に囲まれ、2本の尾根が戦場を3本の谷に分ける。
+// 陸の道：西の谷（氷河の湖と川）・中央の谷（岩の丘に陸の竜脈）・東の谷（一段高い、凍った湖）。
+// 尾根は途中の鞍部（峠）だけ越えられる（旗で乗り換え）。東の尾根の頂に空の竜脈。
+// 西の谷の川は氷河湖から南北に流れて、両方の魔王城の堀になる（海のモンスターの道）。
 
-const shoreX = (zz: number) => -18.5 + 0.8 * (vn(zz / 3, 0, 11) - 0.5);
-/** 雪山（楕円）の中なら 0〜1 未満 */
-const peak = (x: number, zz: number) => (x / 9.5) ** 2 + (zz / 12) ** 2;
-const TUNNEL = 2, HALL = { r: 4, zz: 3.5 };
+const RIDGE_X = 7.5, PASS = { z0: 11, z1: 13.5 };
+/** 西の谷の川の中心の x */
+const riverX = (zz: number) => {
+  const w = -15.5 + 1.2 * Math.sin(zz / 3.5);
+  return zz < 17 ? w : w + (-MOAT_X - w) * smooth(17, MOAT.z0, zz);
+};
+const RIVER_HALF = 1.25, LAKE_R = 3.2, SUMMIT = { x: RIDGE_X, z: 0, top: 8, r: 1.8 };
+
+/** 尾根の高さ（x=±7.5 を走る。陣地の近くでは丘に下がる） */
+function ridge(x: number, zz: number): number {
+  const side = x < 0 ? 0 : 1, t = Math.abs(Math.abs(x) - RIDGE_X);
+  const w = 2.6 + 0.5 * (vn(zz / 3, side, 311) - 0.5);
+  const crest = (4 + 5 * vn(zz / 4.5, side * 7, 303) ** 1.4) * (1 - smooth(13, 21, zz));
+  const pass = zz >= PASS.z0 && zz < PASS.z1;
+  if (pass) return t < w ? 1 : 0;
+  const h = crest * (1 - smooth(w - 1.5, w, t)) + (t < w - 1 ? 1.3 * vn(x / 1.2, zz / 1.2, 305) : 0);
+  return Math.max(0, h);
+}
+/** 谷の外側の壁と、マップの外の高い峰 */
+function walls(x: number, zz: number): number {
+  const d = Math.max(Math.abs(x) - 19.5, zz - 36, 0);
+  if (d <= 0) return 0;
+  return d * 2.2 + 3 * vn(x / 3, zz / 3, 307) + Math.max(0, d - 8) * (0.6 + 1.2 * vn(x / 12, zz / 12, 309));
+}
+
+function snowy(h: number, x: number, zz: number, floor: Bio): Col {
+  const hq = q(h);
+  if (hq > 4.5 + 1.5 * vn(x / 2, zz / 2, 313)) return { h: hq, mat: B.SNOW, sub: B.STONE, bio: Bio.ALPINE };
+  if (hq > 2.5) return { h: hq, mat: vn(x / 1.5, zz / 1.5, 315) > 0.45 ? B.STONE : B.SNOW, sub: B.STONE, bio: Bio.MOUNTAIN };
+  return { h: hq, mat: B.SNOW, sub: B.DIRT, bio: floor };
+}
 
 function column(x: number, zz: number): Col {
-  const sea = backSea(zz);
-  if (sea) return sea;
-  const sx = shoreX(zz);
-  // 西の海（流氷が浮かぶ）
-  if (x < sx) {
-    if (vn(x / 1.6, zz / 1.6, 7) > 0.8 && x < sx - 1.5) return { h: 0, mat: B.ICE, sub: B.ICE, bio: Bio.ISLAND };
-    return { h: q(Math.max(-3, -0.5 - (sx - x) * 0.8)), mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.SEA };
+  const out = !inMap(x, zz);
+  if (!out) {
+    const m = moat(x, zz);
+    if (m) return m;
+    if (moatRim(x, zz)) return { h: 0.5, mat: B.STONE, sub: B.STONE, bio: Bio.COAST };
+    const yard = castleYard(x, zz, B.SNOW);
+    if (yard) return { ...yard, mat: Math.abs(x) <= 1.5 ? B.PATH : B.SNOW };
   }
-  const yard = castleYard(x, zz, B.SNOW);
-  if (yard) return { ...yard, bio: Bio.ALPINE };
-  // 真ん中の雪山と、それを貫く氷の洞窟（奥は広間）
-  const e = peak(x, zz);
-  if (e < 1) {
-    const h = q(4 + 9 * (1 - e) + 1.5 * fbm(x, zz, 17));
-    const hall = Math.abs(x) < HALL.r && zz < HALL.zz;
-    if (Math.abs(x) < TUNNEL || hall) return { h: Math.max(h, 7), mat: B.SNOW, sub: B.STONE, cave: [0, 4.5], bio: Bio.CAVE };
-    return { h, mat: e < 0.75 ? B.SNOW : B.STONE, sub: B.STONE, bio: e < 0.75 ? Bio.ALPINE : Bio.MOUNTAIN };
+  // 東の尾根の頂（空の竜脈）
+  const ds = Math.hypot(x - SUMMIT.x, zz - SUMMIT.z);
+  if (ds < SUMMIT.r) return { h: SUMMIT.top, mat: B.SNOW, sub: B.STONE, bio: Bio.ALPINE };
+  if (ds < SUMMIT.r + 1.5) return snowy(Math.max(ridge(x, zz), SUMMIT.top - (ds - SUMMIT.r) * 1.6), x, zz, Bio.ALPINE);
+
+  // 西の谷：氷河湖と川（氷河から滝が落ちる）
+  const dl = Math.hypot(x - riverX(0), zz);
+  if (dl < LAKE_R) return { h: dl < LAKE_R - 1 ? -2 : -1, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.GLACIER };
+  if (zz < 0.9 && x < riverX(0) && x > -21.5) {
+    // 氷河から段になって落ちる流れ
+    if (x < -19.5) { const w = q(walls(x, zz) * 0.6); return { h: w - 0.5, mat: B.ICE, sub: B.STONE, water: w, bio: Bio.FALLS }; }
+    return { h: -0.5, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.RIVER };
   }
-  // 東の端の山並み（海へ下る）
-  if (x >= 20.5) {
-    const m = q(Math.min(11, 5 + (x - 20.5) * 1.6 + 2 * fbm(x, zz, 91), (24.2 - x) * 4 - 0.5));
-    if (m < 0) return { h: m, mat: B.GRAVEL, sub: B.STONE, water: 0, bio: Bio.SEA };
-    return { h: m, mat: B.SNOW, sub: B.STONE, bio: Bio.ALPINE };
+  const dr = Math.abs(x - riverX(zz));
+  if (!out && zz < MOAT.z0 && dr < RIVER_HALF) {
+    if (zz >= 18 && zz < 20.5) return { h: -0.5, mat: B.STONE, sub: B.GRAVEL, water: 0, bio: Bio.FORD };
+    return { h: dr < RIVER_HALF - 0.5 ? -1.5 : -1, mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.RIVER };
   }
-  // 東の雪の段丘（高台）。陣地側の坂から上がる
-  if (x >= 16.5) {
-    if (zz < 18) return { h: 2, mat: B.SNOW, sub: B.STONE, bio: Bio.HIGHLAND };
-    if (zz < 21) return { h: q(2 * (21 - zz) / 3), mat: B.SNOW, sub: B.DIRT, bio: Bio.HIGHLAND };
-  }
-  // 東の雪原の凍った湖（歩ける氷）
-  if (((x - 13) / 2.6) ** 2 + (zz / 3.4) ** 2 < 1) return { h: 0, mat: B.ICE, sub: B.ICE, bio: Bio.LAKE };
-  // 西の海岸
-  if (x < sx + 2) return { h: 0.5, mat: B.STONE, sub: B.STONE, bio: Bio.COAST };
-  // 雪原（ところどころ岩）
-  if (!(zz > 15 && Math.abs(x) < 6) && vn(x / 1.3, zz / 1.3, 29) > 0.83) return { h: 1.0, mat: B.STONE, sub: B.STONE, bio: Bio.MOUNTAIN };
-  return { h: 0, mat: Math.abs(x) <= 1.5 && zz > 12 ? B.PATH : B.SNOW, sub: B.DIRT, bio: Bio.ALPINE };
+
+  // 谷の底（小さな起伏）と、尾根・外の壁
+  const bump = 0.9 * vn(x / 2.5, zz / 2.5, 317) - 0.3;
+  const east = x > 10 ? 1.5 * (1 - smooth(14, 20, zz)) : 0;
+  const nearBase = smooth(4, 8, Math.hypot(x, zz - 20)) * smooth(2, 5, Math.hypot(Math.max(Math.abs(x) - MOAT.x1 - 0.5, 0), Math.max(MOAT.z0 - zz, 0)));
+  const floor = Math.max(0, bump * smooth(2, 4, dr)) * nearBase + east;
+  const h = Math.max(floor, ridge(x, zz), walls(x, zz));
+
+  // 中央の谷の岩の丘（陸の竜脈）
+  const dk = Math.hypot(x, zz);
+  if (dk < 4.5 && h < 2) return { h: q(Math.max(h, 1 - smooth(1.5, 4.5, dk))), mat: dk < 2 ? B.STONE : B.SNOW, sub: B.STONE, bio: Bio.ALPINE };
+  // 東の谷の凍った湖
+  if (Math.hypot((x - 15) / 2.6, (zz - 5) / 3.2) < 1 && h < 2.5) return { h: q(east), mat: B.ICE, sub: B.ICE, bio: Bio.GLACIER };
+  if (Math.abs(x) <= 1 && zz < MOAT.z0 && h < 1.5) return { h: q(h), mat: B.PATH, sub: B.DIRT, bio: Bio.ALPINE };
+  return snowy(h, x, zz, x > 10 || x < -10 ? Bio.MOUNTAIN : Bio.ALPINE);
 }
 
 export const frost: MapDef = {
   id: 'frost', name: '霊峰の国', icon: '🏔️', climate: '寒冷・雪',
-  desc: '真ん中に大きな雪山。山の左右をまわる雪原の道と、山を貫く氷の洞窟（奥の広間に陸の竜脈）。東には一段高い雪の段丘',
+  desc: '雪山の連なる造山帯。2本の尾根が戦場を3つの谷に分ける。西の谷（氷河湖と川）・中央の谷・東の谷（一段高い）。尾根は峠だけ越えられる',
   column,
-  sky: { x: 13, z: 0, top: 9, r: 2.6, top_mat: B.SNOW },
-  veins: [{ x: 0, z: 0, layer: 'land' }, { x: -21.5, z: 0, layer: 'sea' }, { x: 13, z: 0, layer: 'air' }],
-  laneAt(x) { return Math.abs(x) < HALL.r ? 1 : x < 0 ? 0 : 2; },
-  laneNames: ['西の雪原', '氷の洞窟', '東の雪原'],
-  cpuSpawns: [[-2.5, 2.5, 13.5, 24, 0.4], [-16, -11, 17, 24, 0.3], [10, 15, 17, 24, 0.3]],
-  high: [{ x: 18, z: 4 }, { x: 18, z: 10 }, { x: 18, z: 15 }],
+  veins: [{ x: 0, z: 0, layer: 'land' }, { x: riverX(0), z: 0, layer: 'sea' }, { x: SUMMIT.x, z: SUMMIT.z, layer: 'air' }],
+  waterfalls: [{ x: -19.25, z: 0, top: 2, bottom: 0 }],
+  laneAt(x) {
+    if (x < -10.5) return 0;
+    if (Math.abs(x) < 4.5) return 1;
+    if (x > 10.5) return 2;
+    return -1;
+  },
+  laneNames: ['西の谷', '中央の谷', '東の谷'],
+  cpuSpawns: [[-3.5, 3.5, 13, 23, 0.4], [-13, -10.5, 13, 16.5, 0.3], [11, 17, 13, 16.5, 0.3]],
+  high: [{ x: 11.5, z: 4 }, { x: 12, z: 9 }, { x: 11.5, z: 15 }],
   weather: [{ kind: 'snow', x0: -24, x1: 24, z0: -36, z1: 36, mirror: false, count: 650 }],
+  reserved(x, zz) {
+    return Math.abs(x) <= 1.3 && zz < MOAT.z0;
+  },
 };

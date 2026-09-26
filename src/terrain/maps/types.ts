@@ -1,4 +1,5 @@
 import type { B } from '../grid';
+import type { Decor } from '../mesh';
 import type { Col } from '../gen-util';
 
 // ワールド（マップ）の定義。地形の形・竜脈・道・天気をまとめる
@@ -37,4 +38,6 @@ export interface MapDef {
   rainClouds?: [number, number][];
   /** 飾り（木など）を置かない所 */
   reserved?(x: number, zz: number): boolean;
+  /** そのワールドだけの飾り（建物・像・灯りなど。0.25 のボクセル） */
+  decorate?(d: Decor): void;
 }

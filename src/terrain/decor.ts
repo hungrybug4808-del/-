@@ -1,7 +1,7 @@
 import { hash } from '../core/math';
 import { Bio } from './biomes';
-import { MAP } from './generate';
-import { CELL, NX, NZ, biome, colOf, cx, cz, level, walkY, waterDepth } from './grid';
+import { MAP, outerCol } from './generate';
+import { CELL, NX, NZ, XMAX, XMIN, ZMAX, ZMIN, biome, colOf, cx, cz, level, walkY, waterDepth } from './grid';
 import { DS, Decor } from './mesh';
 
 // 地形ごとの飾り。0.25 のボクセルで組む（キャラクターの細かさに近づける）
@@ -11,7 +11,7 @@ const PINE = [0x2f6b45, 0x3a7a50];
 const BARK = 0x6b4a2e, BARK_D = 0x4f3620, DEAD = 0x7a6650;
 const leaf = (x: number, y: number, z: number) => LEAF[Math.floor(hash(x, y, z) * 3)];
 
-function oak(d: Decor, x: number, y: number, z: number, r: number): void {
+export function oak(d: Decor, x: number, y: number, z: number, r: number): void {
   const th = 5 + Math.floor(r * 4);
   d.box(x, y, z, 2, th, 2, BARK);
   const w = 6, h = 4, x0 = x - 2, z0 = z - 2, y0 = y + th - 1;
@@ -22,7 +22,7 @@ function oak(d: Decor, x: number, y: number, z: number, r: number): void {
   }
   d.box(x - 1, y0 + h, z - 1, 4, 1, 4, leaf);
 }
-function pine(d: Decor, x: number, y: number, z: number, snow: boolean): void {
+export function pine(d: Decor, x: number, y: number, z: number, snow: boolean): void {
   d.box(x, y, z, 1, 3, 1, BARK_D);
   let yy = y + 2;
   for (const w of [7, 5, 5, 3, 1]) {
@@ -49,18 +49,18 @@ function cactus(d: Decor, x: number, y: number, z: number, r: number): void {
   d.box(x + 1, y + 2, z, 1, 1, 1, G2); d.box(x + 2, y + 2, z, 1, 2, 1, G);
   if (r > 0.5) { d.box(x - 1, y + 3, z, 1, 1, 1, G2); d.box(x - 2, y + 3, z, 1, 2, 1, G); }
 }
-function palm(d: Decor, x: number, y: number, z: number): void {
+export function palm(d: Decor, x: number, y: number, z: number): void {
   const P = [0x3f9a4a, 0x55b35a];
   for (let j = 0; j < 8; j++) d.set(x + (j > 4 ? 1 : 0), y + j, z, j & 1 ? 0x9a7a50 : 0x8a6a42);
   const tx = x + 1, ty = y + 8;
   d.set(tx, ty, z, P[0]);
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let k = 1; k <= 3; k++) d.set(tx + dx * k, ty - (k === 3 ? 1 : 0), z + dz * k, P[k & 1]);
 }
-function rock(d: Decor, x: number, y: number, z: number, r: number): void {
+export function rock(d: Decor, x: number, y: number, z: number, r: number): void {
   const S = [0x8a8f99, 0x9da3ad, 0x6e737c];
   d.box(x, y, z, 2 + (r > 0.5 ? 1 : 0), 1 + (r > 0.7 ? 1 : 0), 2, (a, b, c) => S[Math.floor(hash(a, b, c) * 3)]);
 }
-function tuft(d: Decor, x: number, y: number, z: number, c: number, h = 1): void {
+export function tuft(d: Decor, x: number, y: number, z: number, c: number, h = 1): void {
   d.box(x, y, z, 1, h, 1, c);
 }
 
@@ -72,6 +72,30 @@ function reserved(x: number, z: number): boolean {
   for (const v of MAP.veins) if (v.layer === 'land' && Math.hypot(x - v.x, z - v.z) < 2.4) return true;
   return MAP.def.reserved?.(x, zz) ?? false;
 }
+
+/** 地形の種類ごとの飾りを1か所に置く（p・r は 0〜1 の乱数、y はその場所の地面の高さ） */
+function place(d: Decor, bio: Bio, vx: number, vy: number, vz: number, p: number, r: number, y: number): void {
+  switch (bio) {
+    case Bio.FOREST: if (p < 0.12) (r < 0.3 ? pine(d, vx, vy, vz, false) : oak(d, vx, vy, vz, r)); else if (p < 0.2) tuft(d, vx, vy, vz, 0x4e8f3a); break;
+    case Bio.HILLS: if (p < 0.02) oak(d, vx, vy, vz, r); else if (p < 0.08) tuft(d, vx, vy, vz, 0x5f9a45); break;
+    case Bio.HIGHLAND: case Bio.VALLEY: if (p < 0.01) oak(d, vx, vy, vz, r); else if (p < 0.05) tuft(d, vx, vy, vz, r < 0.5 ? 0xf0d040 : 0x5f9a45); break;
+    case Bio.GRASSLAND: if (p < 0.14) tuft(d, vx, vy, vz, r < 0.25 ? 0xe05050 : r < 0.5 ? 0xf0d040 : r < 0.62 ? 0xf6f2f0 : 0x6fae4a, r < 0.62 ? 1 : 2); break;
+    case Bio.PLAIN: if (p < 0.04) tuft(d, vx, vy, vz, 0x5f9a45, 1 + (r > 0.5 ? 1 : 0)); break;
+    case Bio.FARM: if (p < 0.5 && (vz & 3) === 0) tuft(d, vx, vy, vz, r < 0.5 ? 0xc8b040 : 0x8fbf50, 1 + (r > 0.6 ? 1 : 0)); break;
+    case Bio.MOUNTAIN: if (y < 7 && p < 0.08) pine(d, vx, vy, vz, y > 3); else if (p < 0.12) rock(d, vx, vy, vz, r); break;
+    case Bio.ALPINE: if (y < 10.5 && p < 0.04) pine(d, vx, vy, vz, true); break;
+    case Bio.DESERT: if (p < 0.018) cactus(d, vx, vy, vz, r); else if (p < 0.03) rock(d, vx, vy, vz, r); break;
+    case Bio.WASTE: if (p < 0.02) deadTree(d, vx, vy, vz, r); else if (p < 0.06) rock(d, vx, vy, vz, r); else if (p < 0.09) tuft(d, vx, vy, vz, 0x9a8a50); break;
+    case Bio.SWAMP: if (p < 0.05) deadTree(d, vx, vy, vz, r); else if (p < 0.16) tuft(d, vx, vy, vz, 0x7a8a4a, 2); break;
+    case Bio.ISLAND: if (y >= 0.5 && p < 0.25) palm(d, vx, vy, vz); break;
+    case Bio.BEACH: if (p < 0.012) palm(d, vx, vy, vz); break;
+    case Bio.COAST: if (p < 0.05) rock(d, vx, vy, vz, r); break;
+    case Bio.KARST: if (p < 0.3) (r < 0.5 ? pine(d, vx, vy, vz, false) : tuft(d, vx, vy, vz, 0x4e8f3a, 2)); break;
+  }
+}
+
+/** マップの外の近くにも、同じ飾りを粗く置く（遠景が寂しくならないように） */
+const OUTER_DECOR = 12;
 
 export function buildDecor(): Decor {
   const d = new Decor();
@@ -90,21 +114,17 @@ export function buildDecor(): Decor {
         if (bio === Bio.SWAMP && p < 0.12) tuft(d, vx, vy, vz, 0x9aa05a, 3 + Math.floor(r * 2));
         continue;
       }
-      switch (bio) {
-        case Bio.FOREST: if (p < 0.12) (r < 0.3 ? pine(d, vx, vy, vz, false) : oak(d, vx, vy, vz, r)); else if (p < 0.2) tuft(d, vx, vy, vz, 0x4e8f3a); break;
-        case Bio.HILLS: if (p < 0.02) oak(d, vx, vy, vz, r); else if (p < 0.08) tuft(d, vx, vy, vz, 0x5f9a45); break;
-        case Bio.HIGHLAND: case Bio.VALLEY: if (p < 0.01) oak(d, vx, vy, vz, r); else if (p < 0.05) tuft(d, vx, vy, vz, r < 0.5 ? 0xf0d040 : 0x5f9a45); break;
-        case Bio.GRASSLAND: if (p < 0.14) tuft(d, vx, vy, vz, r < 0.25 ? 0xe05050 : r < 0.5 ? 0xf0d040 : r < 0.62 ? 0xf6f2f0 : 0x6fae4a, r < 0.62 ? 1 : 2); break;
-        case Bio.PLAIN: if (p < 0.04) tuft(d, vx, vy, vz, 0x5f9a45, 1 + (r > 0.5 ? 1 : 0)); break;
-        case Bio.MOUNTAIN: if (walkY[c] < 7 && p < 0.08) pine(d, vx, vy, vz, false); else if (p < 0.12) rock(d, vx, vy, vz, r); break;
-        case Bio.ALPINE: if (walkY[c] < 10.5 && p < 0.04) pine(d, vx, vy, vz, true); break;
-        case Bio.DESERT: if (p < 0.018) cactus(d, vx, vy, vz, r); else if (p < 0.03) rock(d, vx, vy, vz, r); break;
-        case Bio.WASTE: if (p < 0.02) deadTree(d, vx, vy, vz, r); else if (p < 0.06) rock(d, vx, vy, vz, r); else if (p < 0.09) tuft(d, vx, vy, vz, 0x9a8a50); break;
-        case Bio.SWAMP: if (p < 0.05) deadTree(d, vx, vy, vz, r); else if (p < 0.16) tuft(d, vx, vy, vz, 0x7a8a4a, 2); break;
-        case Bio.ISLAND: if (walkY[c] >= 0.5 && p < 0.25) palm(d, vx, vy, vz); break;
-        case Bio.BEACH: if (p < 0.012) palm(d, vx, vy, vz); break;
-        case Bio.COAST: if (p < 0.05) rock(d, vx, vy, vz, r); break;
-      }
+      place(d, bio, vx, vy, vz, p, r, walkY[c]);
     }
+  for (let z = ZMIN - OUTER_DECOR; z < ZMAX + OUTER_DECOR; z += 1)
+    for (let x = XMIN - OUTER_DECOR; x < XMAX + OUTER_DECOR; x += 1) {
+      if (x >= XMIN && x < XMAX && z >= ZMIN && z < ZMAX) continue;
+      const c = outerCol(x, z);
+      if (c.water !== undefined && c.water > c.h) continue;
+      const zz = Math.abs(z + 0.5), p = hash(x * 3, Math.round(zz * 3), 5), r = hash(x * 3, Math.round(zz * 3), 9);
+      const vx = Math.round((x + 0.25 + r * 0.5) / DS), vz = Math.round((z + 0.25 + p * 0.5) / DS);
+      place(d, c.bio, vx, Math.round(c.h / DS), vz, p, r, c.h);
+    }
+  MAP.def.decorate?.(d);
   return d;
 }

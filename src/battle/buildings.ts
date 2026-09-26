@@ -140,6 +140,8 @@ export function updateBuildings(dt: number): void {
 
 export function resetBuildings(): void {
   for (const c of blds) {
+    // ワールドによって地面の高さがちがう
+    c.pos.y = groundY(0, c.pos.z);
     c.hp = c.max;
     c.fallT = -1;
     c.g.position.y = c.pos.y;

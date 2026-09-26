@@ -29,16 +29,39 @@ export interface Col {
   cave?: [number, number];
   /** 滝：水が落ちている高さの範囲 */
   falls?: [number, number];
+  /** 岩のアーチ（天然の橋）：下の面と上の面の高さ。下はくぐれる */
+  arch?: [number, number];
+  /** 崖の地層：高さ y のブロックの種類（sub より優先） */
+  strata?: (y: number) => B;
   bio: Bio;
 }
 
-/** どのワールドも同じ：魔王城は z=±30、背中側（|z|>33）は海、城の前庭は |x|<=7.5 */
+/** マップ（ブロックで作る範囲）の中か。外は遠景として粗く描くだけ */
+export const inMap = (x: number, zz: number) => Math.abs(x) < 24 && zz < 36;
+
+/**
+ * どのワールドも同じ：魔王城は z=±30、砦は z=±20、城の前庭は |x|<=7.5・|z|>=25.5。
+ * 前庭の左右と背中は堀（海のモンスターはここから魔王城を攻める）。堀の左右の腕は |z|=23.5 で前に開き、
+ * ワールドの川や水路がここにつながる。
+ */
 export const CASTLE_Z = 30, FORT_Z = 20;
-export function backSea(zz: number): Col | null {
-  if (zz <= 33) return null;
-  return { h: q(Math.max(-3, -1.0 - (zz - 33) * 1.2)), mat: B.GRAVEL, sub: B.GRAVEL, water: 0, bio: Bio.SEA };
+export const MOAT = { x0: 7.5, x1: 10, z0: 23.5, back0: 33, back1: 35.5 };
+/** 堀の腕の中心の |x| */
+export const MOAT_X = (MOAT.x0 + MOAT.x1) / 2;
+export function moat(x: number, zz: number): Col | null {
+  const ax = Math.abs(x);
+  const arm = ax > MOAT.x0 && ax <= MOAT.x1 && zz >= MOAT.z0 && zz < MOAT.back1;
+  const back = ax <= MOAT.x1 && zz >= MOAT.back0 && zz < MOAT.back1;
+  if (!arm && !back) return null;
+  return { h: -1.5, mat: B.GRAVEL, sub: B.STONE, water: 0, bio: Bio.MOAT };
+}
+/** 堀の外側の石垣の縁（堀のすぐ外、1列） */
+export function moatRim(x: number, zz: number): boolean {
+  const ax = Math.abs(x);
+  return (ax > MOAT.x1 && ax <= MOAT.x1 + 0.5 && zz >= MOAT.z0 + 0.5 && zz < MOAT.back1 + 0.5)
+    || (ax <= MOAT.x1 + 0.5 && zz >= MOAT.back1 && zz < MOAT.back1 + 0.5);
 }
 export function castleYard(x: number, zz: number, ground: B = B.GRASS): Col | null {
-  if (zz < 25.5 || Math.abs(x) > 7.5) return null;
+  if (zz < 25.5 || Math.abs(x) > MOAT.x0 || zz >= MOAT.back0) return null;
   return { h: 0, mat: Math.abs(x) <= 1.5 ? B.PATH : ground, sub: B.DIRT, bio: Bio.PLAIN };
 }

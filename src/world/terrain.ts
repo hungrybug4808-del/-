@@ -4,8 +4,8 @@ import { glow, solid } from '../fx/effects';
 import { scene } from '../render/stage';
 import { buildDecor } from '../terrain/decor';
 import { MAP } from '../terrain/generate';
-import { NX, NZ, XMAX, XMIN, ZMAX, ZMIN } from '../terrain/grid';
-import { CHUNK, buildChunk } from '../terrain/mesh';
+import { NX, NZ } from '../terrain/grid';
+import { CHUNK, buildChunk, buildOuter } from '../terrain/mesh';
 
 // 地形・水・飾りをシーンに置き、水の動き（流れ・滝・渦潮）を毎フレーム更新する
 
@@ -31,7 +31,6 @@ const wtex = waterTexture();
 const landMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const decorMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const waterMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: wtex, transparent: true, opacity: 0.8 });
-const seaMat = new THREE.MeshLambertMaterial({ color: 0x2f7fc4, map: wtex, transparent: true, opacity: 0.85 });
 
 // ---- 渦潮 ----
 interface Whirl { g: THREE.Group; x: number; z: number }
@@ -88,17 +87,10 @@ export function buildTerrain(): void {
     const m = keep(new THREE.Mesh(geo, decorMat));
     m.castShadow = m.receiveShadow = true;
   }
-  // マップの外に広がる海
-  const W = 400;
-  for (const [x0, x1, z0, z1] of [[XMIN - W, XMAX + W, ZMAX, ZMAX + W], [XMIN - W, XMAX + W, ZMIN - W, ZMIN], [XMIN - W, XMIN, ZMIN, ZMAX], [XMAX, XMAX + W, ZMIN, ZMAX]]) {
-    const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
-    geo.rotateX(-Math.PI / 2);
-    geo.translate((x0 + x1) / 2, -0.08, (z0 + z1) / 2);
-    const p = geo.attributes.position, uv = geo.attributes.uv;
-    for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 2, p.getZ(i) / 2);
-    const m = keep(new THREE.Mesh(geo, seaMat));
-    m.receiveShadow = true;
-  }
+  // マップの外の遠景（山・森・川などの続き）
+  const outer = buildOuter();
+  for (const geo of outer.land) keep(new THREE.Mesh(geo, landMat)).receiveShadow = true;
+  for (const geo of outer.water) { const m = keep(new THREE.Mesh(geo, waterMat)); m.renderOrder = 1; }
   for (const w of MAP.whirlpools) whirls.push(makeWhirl(w.x, w.z));
 }
 
