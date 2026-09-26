@@ -7,6 +7,7 @@ import type { Building, Team } from '../units/types';
 import { MAP } from '../terrain/generate';
 import { CELL, NX, NZ, blocked, colOf, cx, cz, groundY } from '../terrain/grid';
 import { TEAM, blds } from './world';
+import { type CastleStyle, styledCastle, styledFort } from './castle-styles';
 
 const S1 = 0x8a8f99, S2 = 0x6e737c, S3 = 0x9da3ad;
 
@@ -71,12 +72,18 @@ export const FORT_HP = 900;
 
 const CASTLE_S = 0.45, FORT_S = 0.3;
 
+/** 今のワールドの見た目の建物（草原の国は石の城） */
+function buildingModel(kind: Building['kind'], team: Team, mat: THREE.Material): THREE.Group {
+  const style = MAP.def.id === 'meadow' ? null : (MAP.def.id as CastleStyle);
+  const key = kind + team + (style ?? '');
+  if (kind === 'castle') return part(key, style ? styledCastle(team, style) : castleVox(team), 0, 0, 0, CASTLE_S, mat);
+  return part(key, style ? styledFort(team, style) : fortVox(team), 0, 0, 0, FORT_S, mat);
+}
+
 function makeBuilding(kind: Building['kind'], team: Team, z: number): Building {
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const castle = kind === 'castle';
-  const g = castle
-    ? part('castle' + team, castleVox(team), 0, 0, 0, CASTLE_S, mat)
-    : part('fort' + team, fortVox(team), 0, 0, 0, FORT_S, mat);
+  const g = buildingModel(kind, team, mat);
   const y = groundY(0, z);
   g.position.set(0, y, z);
   if (team === 1) g.rotation.y = Math.PI;
@@ -135,6 +142,18 @@ export function updateBuildings(dt: number): void {
         dust({ x: c.pos.x + rnd(-w, w), z: fz + rnd(-1, 1) }, 3, 1.5);
       }
     } else c.g.visible = false;
+  }
+}
+
+/** ワールドを変えたら、城と砦をそのワールドのデザインに建て替える */
+export function restyleBuildings(): void {
+  for (const b of blds) {
+    const g = buildingModel(b.kind, b.team, b.mat);
+    g.position.copy(b.g.position);
+    g.rotation.copy(b.g.rotation);
+    scene.remove(b.g);
+    scene.add(g);
+    b.g = g;
   }
 }
 

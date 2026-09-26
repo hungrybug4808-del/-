@@ -7,6 +7,7 @@ import { flagMode } from '../battle/flags';
 import { buddy } from '../buddy/buddy';
 import { DEF, HAND } from '../units/registry';
 import type { UnitType } from '../units/types';
+import { makePortraits } from './portraits';
 
 // 画面上の表示（魔王城のHP・魔素・手札・メッセージ・勝敗）
 
@@ -29,11 +30,17 @@ for (let i = 0; i < MANA_MAX; i++) {
 }
 
 const cardBtns = {} as Record<UnitType, HTMLButtonElement>;
+const portraits = makePortraits(HAND);
+/** カードに入りきらない名前の短い呼び名 */
+const SHORT: Partial<Record<UnitType, string>> = { dragon: 'ドラゴン' };
 for (const k of HAND) {
   const d = DEF[k], b = document.createElement('button');
   b.type = 'button';
   b.className = 'card';
-  b.innerHTML = `<span class="ic">${d.icon}</span><span><b>${d.name}</b><small>${d.sub}</small></span><span class="cost">${d.cost}</span>`;
+  b.title = `${d.name}（${d.sub}）`;
+  b.setAttribute('aria-label', `${d.name} 魔素${d.cost}`);
+  b.innerHTML = portraits[k] ? `<img src="${portraits[k]}" alt="">` : `<span class="ic">${d.icon}</span>`;
+  b.innerHTML += `<b>${SHORT[k] ?? d.name}</b><span class="cost">${d.cost}</span>`;
   b.addEventListener('click', () => {
     hand.selected = hand.selected === k ? null : k;
     if (hand.selected) { setFlagMode(false); buddy.targeting = false; }
