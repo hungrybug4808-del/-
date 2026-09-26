@@ -81,24 +81,34 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
 #ending .btns{opacity:0;transition:opacity 2s}
 #ending .btns.show{opacity:1}
 #ending .btn{color:#3a2c14;border-color:#8a6a2a;background:rgba(255,250,235,.5)}
-.vlink{position:fixed;right:18px;bottom:16px;z-index:6;font-size:13px;letter-spacing:.2em;color:var(--gold2);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:2px}
+.vlinks{position:fixed;right:18px;bottom:16px;z-index:6;display:flex;gap:22px}
+.vlink{font-size:13px;letter-spacing:.2em;color:var(--gold2);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:2px}
 .vlink:hover{border-color:var(--gold)}
 
 /* ---------- プレイヤーの動きビューア ---------- */
-#viewer{position:fixed;right:12px;top:12px;bottom:12px;width:318px;z-index:6;overflow:auto;background:var(--panel);border:1px solid var(--line);padding:16px 16px 12px;font-size:13px}
-#viewer h3{font-size:18px;letter-spacing:.2em;color:var(--gold2)}
-#viewer h4{font-size:12px;font-weight:500;color:var(--gold);letter-spacing:.15em;margin:14px 0 6px}
-#viewer .row{display:flex;flex-wrap:wrap;gap:6px}
-#viewer button{background:rgba(243,207,122,.07);border:1px solid var(--line);color:var(--txt);padding:6px 10px;font-size:13px;min-width:38px}
-#viewer button:hover{background:rgba(243,207,122,.2);border-color:var(--gold)}
-#viewer button.on{background:rgba(243,207,122,.28);border-color:var(--gold);color:var(--gold2)}
-#viewer .dirs button{font-size:17px;padding:4px 0;width:44px}
-#viewer label{display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer}
-#viewer .hint{margin-top:14px;color:var(--dim);font-size:11.5px;line-height:1.8}
-#viewer a{color:var(--gold2)}
+.vpanel{position:fixed;right:12px;top:12px;bottom:12px;width:318px;z-index:6;overflow:auto;background:var(--panel);border:1px solid var(--line);padding:16px 16px 12px;font-size:13px}
+.vpanel h3{font-size:18px;letter-spacing:.2em;color:var(--gold2)}
+.vpanel h4{font-size:12px;font-weight:500;color:var(--gold);letter-spacing:.15em;margin:14px 0 6px}
+.vpanel .row{display:flex;flex-wrap:wrap;gap:6px}
+.vpanel button{background:rgba(243,207,122,.07);border:1px solid var(--line);color:var(--txt);padding:6px 10px;font-size:13px;min-width:38px}
+.vpanel button:hover{background:rgba(243,207,122,.2);border-color:var(--gold)}
+.vpanel button.on{background:rgba(243,207,122,.28);border-color:var(--gold);color:var(--gold2)}
+.vpanel .dirs button{font-size:17px;padding:4px 0;width:44px}
+.vpanel label{display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer}
+.vpanel .hint{margin-top:14px;color:var(--dim);font-size:11.5px;line-height:1.8}
+.vpanel a{color:var(--gold2)}
+.einfo{margin-top:10px;padding:10px 12px;border:1px solid var(--line);background:rgba(0,0,0,.25);line-height:1.7}
+.einfo b{font-size:17px;letter-spacing:.12em;color:var(--gold2)}
+.einfo .tag{display:inline-block;margin-left:8px;font-size:11px;padding:0 6px;border:1px solid currentColor;border-radius:2px;vertical-align:2px}
+.einfo p{color:var(--dim);font-size:12px;margin-top:4px}
+.erow{display:grid;grid-template-columns:22px 1fr 1fr 1fr;gap:4px;align-items:center;margin-bottom:4px}
+.erow span{color:var(--gold);font-size:12px;text-align:center}
+.vpanel .erow button{padding:5px 4px;font-size:12px;min-width:0}
+#eLabels div{position:fixed;z-index:5;transform:translate(-50%,0);text-align:right;font-size:12px;letter-spacing:.1em;white-space:nowrap;text-shadow:0 0 6px #000,0 0 3px #000;pointer-events:none;text-align:center}
+#eLabels small{display:block;color:var(--dim);font-size:10px}
 #vNow{position:fixed;left:24px;bottom:20px;z-index:6;font-size:22px;font-weight:700;letter-spacing:.2em;text-shadow:0 0 12px #000;pointer-events:none}
 #vNow small{display:block;font-size:12px;color:var(--dim);letter-spacing:.1em;font-weight:500}
-@media (max-width:760px){#viewer{top:auto;left:8px;right:8px;width:auto;height:46vh}#vNow{bottom:auto;top:14px}}
+@media (max-width:760px){.vpanel{top:auto;left:8px;right:8px;width:auto;height:46vh}#vNow{bottom:auto;top:14px}}
 @media (max-width:760px){#map{flex-direction:column;gap:10px}#mapSvg{height:56vh}#mapInfo{width:92vw}#hud .top{grid-template-columns:1fr 1fr;gap:8px}.prog{grid-column:1/3;order:3}}
 </style>
 <script type="importmap">
@@ -176,9 +186,9 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   </div>
 </section>
 
-<a class="vlink" id="vLink" href="?viewer">プレイヤーの動きを見る →</a>
+<div class="vlinks" id="vLink"><a class="vlink" href="?viewer">プレイヤーの動きを見る →</a><a class="vlink" href="?bestiary">敵・障害物を見る →</a></div>
 
-<aside id="viewer" class="hidden">
+<aside id="viewer" class="vpanel hidden">
   <h3>プレイヤーの動き</h3>
   <h4>敵を斬る（刀を一閃）</h4><div class="row dirs" data-act="slash"></div>
   <h4>小さい障害物 ── 身を翻してかわす</h4><div class="row dirs" data-act="roll"></div>
@@ -197,8 +207,35 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <label><input type="checkbox" id="vFall" checked> 落下（壁が流れる）</label>
   <h4>背景の層（敵・障害物もその層のもの）</h4><div class="row" id="vLayer"></div>
   <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：壁を蹴る<br>Space：連撃4体　R：リセット</p>
-  <p class="hint"><a href="./index.html">← ゲームへ戻る</a></p>
+  <p class="hint"><a href="?bestiary">敵・障害物を見る →</a>　<a href="./index.html">ゲームへ戻る</a></p>
 </aside>
+
+<aside id="bestiary" class="vpanel hidden">
+  <h3>敵と障害物</h3>
+  <div class="einfo" id="eInfo"></div>
+  <h4>えらぶ（層・敵・障害物 小／大）</h4><div id="eList"></div>
+  <h4>見せ方</h4><div class="row" id="eMode"></div>
+  <div id="eOptSpec">
+    <h4>動き</h4>
+    <div class="row"><button id="eCut">斬られる</button><button id="eFin">とどめで散る</button></div>
+    <label><input type="checkbox" id="eAnim" checked> アニメーション</label>
+  </div>
+  <div id="eOptGame" class="hidden">
+    <h4>来る方向</h4><div class="row" id="eDir"></div>
+    <label><input type="checkbox" id="eAct" checked> プレイヤーが対処する（斬る／よける）</label>
+  </div>
+  <div id="eOptList" class="hidden">
+    <h4>並べるもの</h4><div class="row" id="eListKind"></div>
+  </div>
+  <h4>再生速度</h4><div class="row" id="eRate"></div>
+  <h4>カメラ</h4><div class="row" id="eCam"></div>
+  <label><input type="checkbox" id="eAuto"> 自動でまわす</label>
+  <h4>表示</h4>
+  <label><input type="checkbox" id="eBg"> 背景（その層の穴）</label>
+  <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>←→ 層を変える　↑↓ 敵・小・大を変える<br>Space 斬られる　M 見せ方を変える</p>
+  <p class="hint"><a href="?viewer">プレイヤーの動きを見る →</a>　<a href="./index.html">ゲームへ戻る</a></p>
+</aside>
+<div id="eLabels"></div>
 <div id="vNow" class="hidden"></div>
 
 <div id="flash"></div>
@@ -1753,7 +1790,7 @@ addEventListener('keydown', e => {
     case 'clear':
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nextFromClear(); } else if (e.key === 'Escape') showMap(Math.min(G.si + 1, 6));
       return;
-    case 'viewer': viewerKey(e); return;
+    case 'viewer': (V.mode === 'enemy' ? eKey : viewerKey)(e); return;
     case 'ending':
       if ($('endBtns').classList.contains('show') && e.key === 'Escape') showMap(7);
       return;
@@ -1772,7 +1809,7 @@ $('btnEndTitle').onclick = showTitle;
    15. プレイヤーの動きビューア（?viewer）
    ゲームと同じプレイヤー・演出・判定後の処理（hit）をそのまま使う
    ===================================================================== */
-const V = { rate: 1, spawn: true, ring: true, fall: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
+const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, layer: 0, cid: 1000, notes: [], ctrl: null, cam: null };
 const V_SPEED = 30, V_LEAD = 0.9;          // 出した敵・障害物は 0.9 秒でリングに届く
 const V_CAMS = {
   game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 1.06, 0)],
@@ -1838,19 +1875,23 @@ function viewerKey(e) {
   else if (e.key === ' ') { e.preventDefault(); vDo('chain', '4'); }
   else if (e.key === 'r' || e.key === 'R') vDo('reset');
 }
-function startViewer() {
-  G.state = 'viewer'; show('none');
-  $('viewer').classList.remove('hidden'); $('vNow').classList.remove('hidden');
+const vSeg = (box, items, cur, fn) => items.forEach(([v, label]) => { const b = document.createElement('button'); b.textContent = label; b.dataset.v = v; if (v === cur) b.classList.add('on'); b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(v); }; box.appendChild(b); });
+function vInit(mode, panel) {
+  G.state = 'viewer'; V.mode = mode; show('none');
+  $(panel).classList.remove('hidden');
   V.ctrl = new OrbitControls(camera, canvas);
-  V.ctrl.enableDamping = true; V.ctrl.minDistance = 1.2; V.ctrl.maxDistance = 30; V.ctrl.autoRotateSpeed = 2.5;
+  V.ctrl.enableDamping = true; V.ctrl.minDistance = 1.2; V.ctrl.maxDistance = 40; V.ctrl.autoRotateSpeed = 2.5;
   V.ctrl.target.set(0, 0.2, 0);
   camera.position.set(0.8, 1.2, 4.2);
+}
+function startViewer() {
+  vInit('player', 'viewer'); $('vNow').classList.remove('hidden');
   document.querySelectorAll('#viewer .dirs').forEach(box => {
     [0, 1, 2, 3].forEach(d => { const b = document.createElement('button'); b.textContent = '↑→↓←'[d]; b.title = DIR_NAME[d]; b.onclick = () => vDo(box.dataset.act, d); box.appendChild(b); });
   });
   document.querySelectorAll('#viewer [data-chain]').forEach(b => b.onclick = () => vDo('chain', b.dataset.chain));
   document.querySelectorAll('#viewer [data-one]').forEach(b => b.onclick = () => vDo(b.dataset.one));
-  const seg = (box, items, cur, fn) => items.forEach(([v, label]) => { const b = document.createElement('button'); b.textContent = label; b.dataset.v = v; if (v === cur) b.classList.add('on'); b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(v); }; box.appendChild(b); });
+  const seg = vSeg;
   seg($('vRate'), [[1, '×1'], [0.5, '×0.5'], [0.25, '×0.25'], [0.1, '×0.1']], 1, v => V.rate = v);
   seg($('vLayer'), [...STAGES.map((S, i) => [i, S.kan]), [7, '底']], 0, v => { V.layer = v; vClear(); applyTheme(v); });
   for (const [k, [label]] of Object.entries(V_CAMS)) { const b = document.createElement('button'); b.textContent = label; b.dataset.cam = k; b.onclick = () => vSetCam(k); $('vCam').appendChild(b); }
@@ -1860,6 +1901,167 @@ function startViewer() {
   $('vFall').onchange = e => V.fall = e.target.checked;
   P.reset(); vSay('落下中', 'マントがはためき、体がゆっくり揺れる');
   resize();
+}
+
+/* ---------- 敵・障害物ビューア（?bestiary） ---------- */
+const ENEMY_DESC = {
+  bug: '4枚の羽で素早く羽ばたく小さな虫。頭に金の目が2つ。',
+  bird: '翼を大きく打つ夜の鳥。細いくちばしと金の目。',
+  worm: '6つの節がうねって進む。大あごと4つの金の目。',
+  flower: '6枚の花びらが回りながら開閉する。中心に大きな金の目が1つ。',
+  jelly: 'かさが脈打ち、7本の触手がゆれる。金の目が2つ。',
+  guard: '石の体の番人。腕を振り、細い金の目が光る。',
+  shade: '6つの影のかけらが渦を巻く群れ。どのかけらにも金の目。',
+};
+const OBS_DESC = {
+  root: ['ねじれた根のかたまり。回転しながら飛んでくる。', '壁から中心へ突き出す太い根。'],
+  vine: ['葉のかたまりに細いツタが垂れる。', '壁から垂れ下がる3本のツタ。'],
+  rock: ['回転しながら落ちてくる石。', '連なって落ちてくる大岩。'],
+  spout: ['短く噴き出す水柱。', '壁から噴き出す太い水柱。'],
+  bubble: ['小さな泡の渦。', '輪が連なる泡の渦。'],
+  pillar: ['崩れた柱のかけら。', '3つに割れて崩れる石柱。'],
+  vortex: ['ねじれた光の輪。', '輪をまとった光の渦の柱。'],
+};
+const KIND_NAME = { enemy: '敵', small: '障害物（小）', large: '障害物（大）' };
+const E = { mode: 'spec', layer: 0, kind: 'enemy', spec: null, items: [], bg: false, anim: true, dir: -1, act: true, loopT: 0, listKind: 'enemy', hidden: false };
+const eKey1 = new THREE.DirectionalLight(0xfff0dd, 2.4); eKey1.position.set(3, 4, 6);
+const eRim = new THREE.DirectionalLight(0x9fb0ff, 2.0); eRim.position.set(-4, 2, -6);
+const eFill = new THREE.AmbientLight(0x8a8098, 0.8);
+for (const l of [eKey1, eRim, eFill]) { l.visible = false; scene.add(l); }
+const nameOf = (li, kind) => { const S = STAGES[li]; return kind === 'enemy' ? S.enemyName : `${S.obsName}（${kind === 'small' ? '小' : '大'}）`; };
+function eModel(li, kind, size) {
+  const n = { type: kind, dir: 1, show: false };
+  const obj = makeNoteObj(n, STAGES[li]); obj.rotation.z = 0;
+  const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+  obj.position.sub(c);
+  const h = new THREE.Group(); h.add(obj); h.scale.setScalar(size / Math.max(sz.x, sz.y, sz.z)); h.userData.inner = obj;
+  return h;
+}
+function eDrop() {
+  if (E.spec) { scene.remove(E.spec); E.spec = null; }
+  for (const it of E.items) scene.remove(it.h);
+  E.items = []; $('eLabels').innerHTML = ''; vClear();
+}
+function eInfo() {
+  const S = STAGES[E.layer], k = E.kind, big = k === 'large';
+  const tag = k === 'enemy' ? '<span class="tag" style="color:#ffc840">金の目 ＝ 斬る</span>' : `<span class="tag" style="color:#ff7a3a">赤橙のふち ＝ よける</span>`;
+  const how = k === 'enemy' ? '押した方向へ刀を一閃。連撃の最後はとどめで光の粒に。' : big ? 'プレイヤーは反対側の壁を蹴って跳ぶ。' : 'プレイヤーは空中で身を翻してかわす。';
+  $('eInfo').innerHTML = `<div style="font-size:11px;color:var(--gold);letter-spacing:.2em">深界${S.kan}層　${S.name}</div><b>${nameOf(E.layer, k)}</b>${tag}
+    <p>${k === 'enemy' ? ENEMY_DESC[S.enemy] : OBS_DESC[S.obs][big ? 1 : 0]}</p><p>${how}</p>`;
+  document.querySelectorAll('#eList button').forEach(b => b.classList.toggle('on', +b.dataset.l === E.layer && b.dataset.k === k));
+}
+function eBackground() {
+  themeKey = -1; applyTheme(E.layer);
+  const on = E.bg || E.mode === 'game';
+  world.visible = on; motes.obj.visible = on; abyssGlow.visible = on; for (const g of globals) g.visible = on;
+  if (!on) { scene.background.set(0x16141c); scene.fog.density = 0.006; }
+  for (const l of [eKey1, eRim, eFill]) l.visible = E.mode !== 'game';
+}
+function eCamFor(key) {
+  if (key === 'game') return V_CAMS.game;
+  const d = E.mode === 'list' ? (E.listKind === 'large' ? 11.5 : 14.5) : E.kind === 'large' ? 7.5 : 4.2;
+  const dir = { front: [0, 0.15, 1], diag: [0.7, 0.4, 0.75], side: [1, 0.12, 0], back: [0, 0.15, -1], top: [0, 1, 0.08] }[key];
+  return [key, new THREE.Vector3(...dir).normalize().multiplyScalar(d), new THREE.Vector3(0, 0, 0)];
+}
+function eSetCam(key) {
+  const [, pos, tgt] = eCamFor(key);
+  V.cam = { pos: pos.clone(), tgt: tgt.clone(), t: 0 };
+  document.querySelectorAll('#eCam button').forEach(b => b.classList.toggle('on', b.dataset.cam === key));
+}
+function eBuild() {
+  eDrop(); eInfo();
+  const spec = E.mode === 'spec', game = E.mode === 'game', list = E.mode === 'list';
+  $('eOptSpec').classList.toggle('hidden', !spec); $('eOptGame').classList.toggle('hidden', !game); $('eOptList').classList.toggle('hidden', !list);
+  $('eCut').disabled = $('eFin').disabled = E.kind !== 'enemy';
+  P.reset(); P.root.visible = game; V.ring = game;
+  eBackground();
+  if (spec) { E.spec = eModel(E.layer, E.kind, E.kind === 'large' ? 5 : 2.2); scene.add(E.spec); E.hidden = false; }
+  if (list) {
+    const k = E.listKind, gap = 2.2;
+    STAGES.forEach((S, i) => {
+      const h = eModel(i, k, k === 'large' ? 5.2 : 1.6); if (k === 'large') h.position.set(0.8, (3 - i) * 1.25, 0); else h.position.x = (i - 3) * gap; scene.add(h);
+      const lab = document.createElement('div'); lab.innerHTML = `${nameOf(i, k)}<small>深界${S.kan}層</small>`; $('eLabels').appendChild(lab);
+      E.items.push({ h, lab });
+    });
+  }
+  if (game) E.loopT = 0.2;
+}
+function eSetMode(m) {
+  E.mode = m;
+  document.querySelectorAll('#eMode button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  eBuild(); eSetCam(m === 'game' ? 'game' : m === 'list' ? 'front' : 'diag');
+}
+function ePick(li, kind) { E.layer = li; E.kind = kind; V.layer = li; if (E.mode === 'list') E.listKind = kind; eBuild(); if (E.mode === 'spec') eSetCam('diag'); refreshListKind(); }
+function refreshListKind() { document.querySelectorAll('#eListKind button').forEach(b => b.classList.toggle('on', b.dataset.v === E.listKind)); }
+function eCut(big) {
+  if (E.mode !== 'spec' || E.kind !== 'enemy' || E.hidden || !E.spec) return;
+  initAudio(); E.hidden = true;
+  const pos = new THREE.Vector3(); E.spec.getWorldPosition(pos);
+  const a = Math.random() * TAU;
+  const m = arcMesh(0.9, 1.3, a - 1.3, 2.6, GOLD, 0.8); m.position.z = 0.9;
+  fxAdd(m, 0.35, (o, k) => o.material.opacity = 0.8 * k * k);
+  if (!big) { SFX.slash(false); burst(pos, 70, GOLD, 5, 0.9, 0.2); E.spec.visible = false; }
+  else {
+    SFX.slash(true); shockwave(a);
+    fxLater(0.06, () => { G.hitstop = 0.16; fxLater(0.001, () => { burst(pos, 220, GOLD, 7, 1.3, 0.28); burst(pos, 60, WHITE, 9, 1, 0.18); if (E.spec) E.spec.visible = false; }); });
+  }
+  fxLater(1.5, () => { if (E.spec) E.spec.visible = true; E.hidden = false; });
+}
+function eUpdate(dt) {
+  const tick = h => { const o = h.userData.inner; if (E.anim && dt > 0) { o.userData.tick?.(G.vt); const sp = o.userData.spin; if (sp) { o.rotation.x += sp.x * dt; o.rotation.y += sp.y * dt; } } };
+  if (E.spec) tick(E.spec);
+  for (const it of E.items) {
+    tick(it.h);
+    const big = E.listKind === 'large', p = new THREE.Vector3(); it.h.getWorldPosition(p); if (big) p.x -= 3.1; else p.y -= 1.2; p.project(camera);
+    it.lab.style.transform = big ? 'translate(-100%,-50%)' : '';
+    it.lab.style.left = ((p.x + 1) / 2 * innerWidth) + 'px'; it.lab.style.top = ((1 - p.y) / 2 * innerHeight) + 'px';
+    it.lab.style.display = p.z < 1 ? '' : 'none';
+  }
+  if (E.mode === 'game') {       // ゲームと同じ速さで、奥からリングへ繰り返し来る
+    E.loopT -= dt;
+    if (E.loopT <= 0) {
+      E.loopT = 1.6;
+      const d = E.dir >= 0 ? E.dir : Math.floor(Math.random() * 4);
+      initAudio(); if (P.st.act?.type === 'tumble') P.reset();
+      const n = vNote(E.kind, d, 0);
+      if (!E.act) n.judged = true;   // 対処しないときは、そのまま通り抜ける
+    }
+  }
+}
+function eKey(e) {
+  const kinds = ['enemy', 'small', 'large'];
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); ePick((E.layer + (e.key === 'ArrowRight' ? 1 : 6)) % 7, E.kind); }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); ePick(E.layer, kinds[(kinds.indexOf(E.kind) + (e.key === 'ArrowDown' ? 1 : 2)) % 3]); }
+  else if (e.key === ' ') { e.preventDefault(); eCut(false); }
+  else if (e.key === 'm' || e.key === 'M') { const ms = ['spec', 'game', 'list']; eSetMode(ms[(ms.indexOf(E.mode) + 1) % 3]); }
+}
+function startBestiary() {
+  vInit('enemy', 'bestiary');
+  V.spawn = true; V.fall = true;
+  const list = $('eList');
+  STAGES.forEach((S, i) => {
+    const row = document.createElement('div'); row.className = 'erow';
+    row.innerHTML = `<span>${S.kan}</span>`;
+    [['enemy', S.enemyName], ['small', S.obsName + ' 小'], ['large', S.obsName + ' 大']].forEach(([k, label]) => {
+      const b = document.createElement('button'); b.textContent = label; b.dataset.l = i; b.dataset.k = k; b.title = nameOf(i, k);
+      b.onclick = () => ePick(i, k); row.appendChild(b);
+    });
+    list.appendChild(row);
+  });
+  vSeg($('eMode'), [['spec', '標本'], ['game', 'ゲームでの見え方'], ['list', '一覧']], 'spec', eSetMode);
+  vSeg($('eDir'), [[-1, 'ランダム'], [0, '↑'], [1, '→'], [2, '↓'], [3, '←']], -1, v => E.dir = v);
+  vSeg($('eListKind'), [['enemy', '敵7体'], ['small', '障害物（小）'], ['large', '障害物（大）']], 'enemy', v => { E.listKind = v; eBuild(); eSetCam('front'); });
+  vSeg($('eRate'), [[1, '×1'], [0.5, '×0.5'], [0.25, '×0.25'], [0.1, '×0.1']], 1, v => V.rate = v);
+  for (const [k, label] of [['front', '正面'], ['diag', '斜め'], ['side', '横'], ['back', '後ろ'], ['top', '上'], ['game', 'ゲームの視点']]) {
+    const b = document.createElement('button'); b.textContent = label; b.dataset.cam = k; b.onclick = () => eSetCam(k); $('eCam').appendChild(b);
+  }
+  $('eCut').onclick = () => eCut(false); $('eFin').onclick = () => eCut(true);
+  $('eAnim').onchange = e => E.anim = e.target.checked;
+  $('eAct').onchange = e => E.act = e.target.checked;
+  $('eAuto').onchange = e => V.ctrl.autoRotate = e.target.checked;
+  $('eBg').onchange = e => { E.bg = e.target.checked; eBackground(); };
+  resize();
+  eSetMode('spec');
 }
 
 /* =====================================================================
@@ -1886,6 +2088,7 @@ function frame(now) {
   for (const m of pointMats) m.uniforms.scale.value ||= 400;
   if (G.state === 'play') updatePlay();
   if (viewer) vUpdate(vdt);
+  if (viewer && V.mode === 'enemy') eUpdate(vdt);
   // 落下の速さ
   const target = G.state === 'dying' || G.state === 'over' ? 0.25 : G.state === 'clearing' ? 3.2 : G.state === 'ending' ? 0.45 : G.state === 'play' ? 1 : viewer ? (V.fall ? 1 : 0) : 0.6;
   G.speedK = lerp(G.speedK, target, 1 - Math.exp(-rdt * (G.state === 'ending' ? 0.25 : 2)));
@@ -1918,9 +2121,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 applyTheme(0); resize();
-if (QS.has('viewer')) startViewer(); else show('title');
+if (QS.has('viewer')) startViewer(); else if (QS.has('bestiary')) startBestiary(); else show('title');
 requestAnimationFrame(frame);
-window.__naraku = { V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
+window.__naraku = { E, ePick, eSetMode, eCut, V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
 </script>
 </body>
 </html>
