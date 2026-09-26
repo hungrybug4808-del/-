@@ -298,6 +298,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -836,7 +837,15 @@ const CAM_POS = new THREE.Vector3(0, 0, 9.5), CAM_LOOK = new THREE.Vector3(0, 0,
 camera.position.copy(CAM_POS); camera.lookAt(CAM_LOOK);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.8, 0.5, 0.78);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.4, 0.85);
+// 明るさの上限：光が何個重なっても、ここより明るくならない（白飛びを防ぐ）。発光もこの値から計算する
+const LIGHT_CAP = 1.6;
+const capPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, cap: { value: LIGHT_CAP } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float cap; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); float m = max(c.r, max(c.g, c.b)); c.rgb *= m > cap ? cap / m : 1.0; gl_FragColor = c; }',
+});
+composer.insertPass(capPass, 1);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
@@ -896,13 +905,13 @@ class Sparks {
     this.geo.attributes.pcolor.needsUpdate = true; this.geo.attributes.psize.needsUpdate = true;
   }
 }
-const sparks = new Sparks(2600); scene.add(sparks.obj);
+const sparks = new Sparks(600); scene.add(sparks.obj);   // 同時に出る光の粒は600個まで（古いものから消える）
 const _v = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
 function burst(pos, n, color, speed = 5, life = 0.9, size = 0.22) {
   for (let i = 0; i < n; i++) {
     _v.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize().multiplyScalar(speed * (0.3 + Math.random()));
-    _c.copy(color).multiplyScalar(0.6 + Math.random() * 0.8);
-    sparks.emit(pos, _v, life * (0.5 + Math.random() * 0.7), size * (0.5 + Math.random()), _c, 1.8);
+    _c.copy(color).multiplyScalar(0.5 + Math.random() * 0.5);
+    sparks.emit(pos, _v, life * 0.55 * (0.5 + Math.random() * 0.7), size * (0.5 + Math.random()), _c, 1.8);
   }
 }
 
@@ -978,12 +987,12 @@ function basicHDR(c, k, o = {}) { return new THREE.MeshBasicMaterial({ color: hd
 
 const DECOR = {
   moss(g, fn, rng, th) {
-    const m = new THREE.InstancedMesh(new THREE.CircleGeometry(0.55, 5).rotateX(-Math.PI / 2), basicHDR(th.moss, 0.6, { transparent: true, opacity: 0.55 }), 70);
+    const m = new THREE.InstancedMesh(new THREE.CircleGeometry(0.55, 5).rotateX(-Math.PI / 2), basicHDR(th.moss, 0.45, { transparent: true, opacity: 0.5 }), 70);
     for (let i = 0; i < 70; i++) { const s = 0.2 + rng() * 0.8; m.setMatrixAt(i, onWall(rng() * TAU, (rng() - 0.5) * TUN.L, fn, 0.12, s, 1, s * (0.6 + rng()))); }
     g.add(m);
   },
   crystals(g, fn, rng, th) {
-    const m = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.5, 0), basicHDR(th.crys, 1.2), 12);
+    const m = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.5, 0), new THREE.MeshStandardMaterial({ color: th.crys, emissive: th.crys, emissiveIntensity: 0.55, transparent: true, opacity: 0.8, roughness: 0.2, flatShading: true }), 12);
     for (let i = 0; i < 12; i++) { const s = 0.3 + rng() * 0.6; m.setMatrixAt(i, onWall(rng() * TAU, (rng() - 0.5) * TUN.L, fn, 0.1, s * 0.45, s * (1.6 + rng() * 1.6), s * 0.45, (rng() - 0.5) * 1.2, rng() * 3)); }
     g.add(m);
   },
@@ -1384,10 +1393,10 @@ function outlineGeo(g) {
 const NM = {
   body: stdMat(0x3a3348, { roughness: 0.5, emissive: 0x241a34 }),
   wing: new THREE.MeshStandardMaterial({ color: 0x302a40, flatShading: true, side: THREE.DoubleSide, transparent: true, opacity: 0.85, roughness: 0.5 }),
-  eye: new THREE.MeshBasicMaterial({ color: new THREE.Color(4.2, 2.9, 0.55) }),
+  eye: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.12, 0.22), transparent: true }),
   eyeGlow: new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(1.5, 1.0, 0.15), transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }),
   outline: new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(3.4, 0.95, 0.18) }, w: { value: 0.05 } }, side: THREE.BackSide,
+    uniforms: { c: { value: new THREE.Color(1.6, 0.42, 0.06) }, w: { value: 0.05 } }, side: THREE.BackSide, transparent: true,
     vertexShader: 'uniform float w; void main(){ vec3 p=position+normal*w; gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0); }',
     fragmentShader: 'uniform vec3 c; void main(){ gl_FragColor=vec4(c,1.0); }',
   }),
@@ -1402,10 +1411,10 @@ function mesh(parent, g, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1
   if (typeof s === 'number') m.scale.setScalar(s); else m.scale.set(...s);
   parent.add(m); return m;
 }
-function eye(parent, x, y, z, r = 0.055) { mesh(parent, gIco(r), NM.eye, x, y, z); const s = new THREE.Sprite(NM.eyeGlow); s.position.set(x, y, z + 0.02); s.scale.setScalar(r * 4); parent.add(s); }
+function eye(parent, x, y, z, r = 0.055) { mesh(parent, gIco(r), NM.eye, x, y, z).renderOrder = 20; const s = new THREE.Sprite(NM.eyeGlow); s.position.set(x, y, z + 0.02); s.scale.setScalar(r * 4); parent.add(s); }
 function omesh(parent, g, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1) { // 赤橙の縁取りつき
   const m = mesh(parent, g, mat, x, y, z, rx, ry, rz, s);
-  const o = mesh(parent, outlineGeo(g), NM.outline, x, y, z, rx, ry, rz, s); o.renderOrder = -1;
+  const o = mesh(parent, outlineGeo(g), NM.outline, x, y, z, rx, ry, rz, s); o.renderOrder = 20;   // 斬撃などの光より後に描いて、ふち取りが必ず見えるようにする
   return m;
 }
 
@@ -1451,7 +1460,7 @@ const ENEMY = {
   guard(g) {
     mesh(g, gBox(0.6, 0.62, 0.4), NM.body); mesh(g, gBox(0.36, 0.3, 0.32), NM.body, 0, 0.5, 0.04);
     const aR = mesh(g, gBox(0.18, 0.6, 0.18), NM.body, 0.44, -0.05, 0), aL = mesh(g, gBox(0.18, 0.6, 0.18), NM.body, -0.44, -0.05, 0);
-    mesh(g, gBox(0.12, 0.035, 0.02), NM.eye, 0.08, 0.53, 0.21); mesh(g, gBox(0.12, 0.035, 0.02), NM.eye, -0.08, 0.53, 0.21);
+    mesh(g, gBox(0.12, 0.035, 0.02), NM.eye, 0.08, 0.53, 0.21).renderOrder = 20; mesh(g, gBox(0.12, 0.035, 0.02), NM.eye, -0.08, 0.53, 0.21).renderOrder = 20;
     for (const x of [0.08, -0.08]) { const s = new THREE.Sprite(NM.eyeGlow); s.position.set(x, 0.53, 0.24); s.scale.setScalar(0.22); g.add(s); }
     return t => { aR.rotation.x = Math.sin(t * 3) * 0.3; aL.rotation.x = -Math.sin(t * 3) * 0.3; };
   },
@@ -1523,29 +1532,29 @@ function arcMesh(r0, r1, th0, len, color, op = 1) {
 }
 function fxAdd(obj, life, upd) { FX.items.push({ obj, life, max: life, upd }); }
 function fxLater(delay, fn) { FX.later.push({ t: delay, fn }); }
-const GOLD = new THREE.Color(3.2, 2.2, 0.6), WHITE = new THREE.Color(3, 3, 2.6);
+const GOLD = new THREE.Color(1.5, 1.05, 0.3), WHITE = new THREE.Color(1.4, 1.4, 1.2);   // 加算で重なるので控えめに
 function slashArc(ang, big = false) {
   const span = big ? 3.4 : 2.2;
-  const m = arcMesh(big ? RING_R - 0.9 : RING_R - 0.75, RING_R + (big ? 0.5 : 0.35), ang - span / 2, span, GOLD, big ? 0.45 : 0.55);
-  fxAdd(m, big ? 0.45 : 0.28, (o, k) => { o.material.opacity = (big ? 0.45 : 0.55) * k * k; o.scale.setScalar(1 + (1 - k) * 0.12); });
+  const m = arcMesh(big ? RING_R - 0.5 : RING_R - 0.6, RING_R + (big ? 0.3 : 0.3), ang - span / 2, span, GOLD, big ? 0.3 : 0.35);
+  fxAdd(m, big ? 0.4 : 0.25, (o, k) => { o.material.opacity = (big ? 0.3 : 0.35) * k * k; o.scale.setScalar(1 + (1 - k) * 0.12); });
 }
 function chainArc(a0, dA) {
   const th0 = dA >= 0 ? a0 : a0 + dA;
-  const m = arcMesh(RING_R - 0.13, RING_R + 0.13, th0, Math.abs(dA), GOLD, 1);
-  const it = { obj: m, life: 6, max: 6, upd: (o, k) => { o.material.opacity = Math.min(1, k * 6); }, chain: true };
+  const m = arcMesh(RING_R - 0.1, RING_R + 0.1, th0, Math.abs(dA), GOLD, 0.6);
+  const it = { obj: m, life: 6, max: 6, upd: (o, k) => { o.material.opacity = Math.min(0.6, k * 4); }, chain: true };
   FX.items.push(it); return it;
 }
 function circleDone() { // 一周すると光の円が完成する
-  const m = arcMesh(RING_R - 0.12, RING_R + 0.12, 0, TAU, WHITE, 1);
-  fxAdd(m, 0.9, (o, k) => { o.material.opacity = k * 0.8; o.scale.setScalar(1 + (1 - k) * 0.35); });
-  for (let i = 0; i < 80; i++) { const a = i / 80 * TAU; _p.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, 0); _v.set(Math.cos(a) * 2, Math.sin(a) * 2, (Math.random() - 0.5) * 2); sparks.emit(_p, _v, 0.8, 0.16, GOLD, 1.5); }
+  const m = arcMesh(RING_R - 0.1, RING_R + 0.1, 0, TAU, WHITE, 0.5);
+  fxAdd(m, 0.7, (o, k) => { o.material.opacity = k * 0.5; o.scale.setScalar(1 + (1 - k) * 0.35); });
+  for (let i = 0; i < 36; i++) { const a = i / 36 * TAU; _p.set(Math.cos(a) * RING_R, Math.sin(a) * RING_R, 0); _v.set(Math.cos(a) * 2, Math.sin(a) * 2, (Math.random() - 0.5) * 2); sparks.emit(_p, _v, 0.45, 0.14, GOLD, 1.5); }
   ringMat.opacity = 1;
 }
 function shockwave(ang) { // 光の斬撃が衝撃波として飛ぶ
-  const m = arcMesh(1.0, 1.3, ang - 0.7, 1.4, GOLD, 0.8);
-  fxAdd(m, 0.4, (o, k) => { o.scale.setScalar(1 + (1 - k) * 3.2); o.material.opacity = 0.8 * k * k; });
+  const m = arcMesh(1.0, 1.25, ang - 0.7, 1.4, GOLD, 0.45);
+  fxAdd(m, 0.35, (o, k) => { o.scale.setScalar(1 + (1 - k) * 3); o.material.opacity = 0.45 * k * k; });
 }
-function flash(v) { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = v; requestAnimationFrame(() => { f.style.transition = 'opacity .7s ease-out'; f.style.opacity = 0; }); }
+function flash(v, sec = 0.25) { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = v; requestAnimationFrame(() => { f.style.transition = `opacity ${sec}s ease-out`; f.style.opacity = 0; }); }
 function updateFX(dt) {
   for (let i = FX.later.length - 1; i >= 0; i--) { const l = FX.later[i]; l.t -= dt; if (l.t <= 0 && dt > 0) { FX.later.splice(i, 1); l.fn(); } }
   for (let i = FX.items.length - 1; i >= 0; i--) {
@@ -1676,7 +1685,7 @@ function hit(n) {
 }
 function killEnemy(n, count) {
   if (!n.obj) return;
-  burst(n.obj.position, count, GOLD, 5, 0.8, 0.22);
+  burst(n.obj.position, Math.min(count, 18), GOLD, 5, 0.8, 0.2);
   removeNote(n); G.live = G.live.filter(x => x !== n);
 }
 function finisher(n) {
@@ -1688,11 +1697,11 @@ function finisher(n) {
   fxLater(0.06, () => {
     G.hitstop = n.kime ? 0.24 : 0.12;
     fxLater(0.001, () => {
-      if (n.kime) { flash(0.85); G.shake = 0.6; circleDone(); }
+      if (n.kime) { flash(0.28); G.shake = 0.45; circleDone(); }
       else G.shake = Math.max(G.shake, 0.25);
       if (n.obj) {
-        burst(n.obj.position, n.kime ? 320 : 130, GOLD, n.kime ? 9 : 7, n.kime ? 1.6 : 1.1, n.kime ? 0.34 : 0.26);
-        if (n.kime) burst(n.obj.position, 120, WHITE, 12, 1.2, 0.2);
+        burst(n.obj.position, n.kime ? 90 : 45, GOLD, n.kime ? 8 : 6, n.kime ? 1.4 : 1.0, n.kime ? 0.28 : 0.22);
+        if (n.kime) burst(n.obj.position, 30, WHITE, 10, 1.0, 0.18);
       }
       killEnemy(n, 0);
       for (const a of chainArcs) { a.life = Math.min(a.life, 0.6); a.max = 0.6; a.upd = (o, k) => { o.material.opacity = k; o.scale.setScalar(1 + (1 - k) * 0.25); }; }
@@ -2159,10 +2168,10 @@ function eCut(big) {
   const a = Math.random() * TAU;
   const m = arcMesh(0.9, 1.3, a - 1.3, 2.6, GOLD, 0.8); m.position.z = 0.9;
   fxAdd(m, 0.35, (o, k) => o.material.opacity = 0.8 * k * k);
-  if (!big) { SFX.slash(false); burst(pos, 70, GOLD, 5, 0.9, 0.2); E.spec.visible = false; }
+  if (!big) { SFX.slash(false); burst(pos, 18, GOLD, 5, 0.9, 0.2); E.spec.visible = false; }
   else {
     SFX.slash(true); shockwave(a);
-    fxLater(0.06, () => { G.hitstop = 0.16; fxLater(0.001, () => { burst(pos, 220, GOLD, 7, 1.3, 0.28); burst(pos, 60, WHITE, 9, 1, 0.18); if (E.spec) E.spec.visible = false; }); });
+    fxLater(0.06, () => { G.hitstop = 0.16; fxLater(0.001, () => { burst(pos, 60, GOLD, 7, 1.3, 0.26); burst(pos, 20, WHITE, 9, 1, 0.18); if (E.spec) E.spec.visible = false; }); });
   }
   fxLater(1.5, () => { if (E.spec) E.spec.visible = true; E.hidden = false; });
 }
@@ -2385,7 +2394,7 @@ function frame(now) {
     camera.position.set(CAM_POS.x + (Math.random() - 0.5) * s, CAM_POS.y + (Math.random() - 0.5) * s, CAM_POS.z);
     camera.lookAt(CAM_LOOK);
   }
-  bloom.strength = 0.8 + P.st.flare * 1.6;
+  bloom.strength = Math.min(0.85, 0.5 + P.st.flare * 0.5);   // 発光の強さにも上限
   composer.render();
   requestAnimationFrame(frame);
 }
