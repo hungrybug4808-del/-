@@ -224,7 +224,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <h3>プレイヤーの動き</h3>
   <h4>敵を斬る（刀を一閃）</h4><div class="row dirs" data-act="slash"></div>
   <h4>小さい障害物 ── 身を翻してかわす</h4><div class="row dirs" data-act="roll"></div>
-  <h4>大きい障害物 ── 反対側の壁を蹴って跳ぶ</h4><div class="row dirs" data-act="kick"></div>
+  <h4>大きい障害物 ── 身を翻して反対側へ移る</h4><div class="row dirs" data-act="shift"></div>
   <h4>連撃（最後の1体はとどめ）</h4>
   <div class="row"><button data-chain="3">3体</button><button data-chain="4">4体（一周）</button><button data-chain="show">斬り見せ場（8体＋決め）</button></div>
   <h4>とどめ（大きく振り抜き → 衝撃波 → ヒットストップ）</h4><div class="row dirs" data-act="fin"></div>
@@ -238,7 +238,7 @@ h2{font-size:34px;letter-spacing:.3em;font-weight:800}
   <label><input type="checkbox" id="vRing" checked> 判定リング</label>
   <label><input type="checkbox" id="vFall" checked> 落下（壁が流れる）</label>
   <h4>背景の層（敵・障害物もその層のもの）</h4><div class="row" id="vLayer"></div>
-  <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：壁を蹴る<br>Space：連撃4体　R：リセット</p>
+  <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：反対側へ移る<br>Space：連撃4体　R：リセット</p>
   <p class="hint"><a href="#bestiary">敵・障害物 →</a>　<a href="#scenery">背景 →</a>　<a href="#title">ゲームへ戻る</a></p>
 </aside>
 
@@ -1310,7 +1310,7 @@ const P = (() => {
       st.sword = big ? 0.9 : 0.55;
     },
     roll(dir) { setAct('roll', dir, 0.36, { sign: Math.random() < 0.5 ? 1 : -1 }); },
-    kick(dir) { setAct('kick', dir, 0.62); },
+    shift(dir) { setAct('shift', dir, 0.8, { sign: Math.random() < 0.5 ? 1 : -1 }); },
     tumble() { setAct('tumble', 0, 99); },
     flareUp() { st.flare = 1; },
     update(dt, t) {
@@ -1331,10 +1331,13 @@ const P = (() => {
           const la = LANE_ANG[a.dir]; const k = Math.sin(p * Math.PI) * 0.7; px -= Math.cos(la) * k; py -= Math.sin(la) * k;
           armRz = 0.4; armLz = -0.4; legSpread = 0.05;
           if (p >= 1) st.act = null;
-        } else if (a.type === 'kick') { // 反対側の壁を蹴って跳ぶ
-          const la = LANE_ANG[a.dir], k = Math.sin(Math.min(1, p * 1.3) * Math.PI) * 1.75;
+        } else if (a.type === 'shift') { // 大きい障害物：空中で身を翻して反対側へ移り、通り過ぎたら戻る
+          const la = LANE_ANG[a.dir];
+          const out = p < 0.35 ? easeInOut(p / 0.35) : p < 0.68 ? 1 : 1 - easeInOut((p - 0.68) / 0.32);
+          const k = out * 1.3 + (p > 0.68 ? Math.sin((p - 0.68) / 0.32 * Math.PI) * 0.08 : 0);   // 戻るときに少し体勢を整える
           px -= Math.cos(la) * k; py -= Math.sin(la) * k;
-          rx += easeInOut(p) * TAU; legSpread = 0.02 + Math.sin(p * Math.PI) * 0.5; armRz = 2.4; armLz = -2.4;
+          rz += easeInOut(Math.min(1, p / 0.4)) * TAU * a.sign;
+          armRz = 0.4 + out * 0.5; armLz = -0.4 - out * 0.5; legSpread = 0.05 + out * 0.2;
           if (p >= 1) st.act = null;
         } else if (a.type === 'tumble') { // 体勢を崩して闇へ
           rx += a.t * 5.5; rz += a.t * 3.4; ry += a.t * 1.3;
@@ -1686,7 +1689,7 @@ function hit(n) {
     P.slash(n.dir); slashArc(ang); SFX.slash(false);
     killEnemy(n, 40);
   } else if (n.type === 'small') { P.roll(n.dir); SFX.whoosh(false); }
-  else { P.kick(n.dir); SFX.whoosh(true); G.shake = Math.max(G.shake, 0.12); }
+  else { P.shift(n.dir); SFX.whoosh(true); }
 }
 function killEnemy(n, count) {
   if (!n.obj) return;
@@ -2007,7 +2010,7 @@ function vClear() { for (const n of V.notes) removeNote(n); V.notes = []; G.live
 const VACT = {
   slash(d) { vNote('enemy', d, 0); vSay(`斬る（${DIR_NAME[d]}）`, '押した方向へ刀を一閃。光の軌跡が残る'); },
   roll(d) { vNote('small', d, 0); vSay(`身を翻す（${DIR_NAME[d]}から${STAGES[Math.min(V.layer, 6)].obsName}）`, '小さい障害物：空中で回転してかわす'); },
-  kick(d) { vNote('large', d, 0); vSay(`壁を蹴って跳ぶ（${DIR_NAME[d]}から${STAGES[Math.min(V.layer, 6)].obsName}）`, '大きい障害物：反対側へ跳ぶ'); },
+  shift(d) { vNote('large', d, 0); vSay(`反対側へ移る（${DIR_NAME[d]}から${STAGES[Math.min(V.layer, 6)].obsName}）`, '大きい障害物：空中で身を翻して反対側へ移る'); },
   fin(d) { vNote('enemy', d, 0, { fin: true }); vSay(`とどめ（${DIR_NAME[d]}）`, '大きく振り抜き → 衝撃波 → ヒットストップ → 光の粒'); },
   chain(kind) {
     const show = kind === 'show', len = show ? 9 : +kind, id = V.cid++, d0 = Math.floor(Math.random() * 4), rot = Math.random() < 0.5 ? 1 : 3;
@@ -2036,7 +2039,7 @@ function vCamera(dt) {
   V.ctrl.update();
 }
 function viewerKey(e) {
-  if (e.key in KEYDIR) { const d = KEYDIR[e.key]; vDo(e.shiftKey ? 'roll' : e.altKey ? 'kick' : 'slash', d); }
+  if (e.key in KEYDIR) { const d = KEYDIR[e.key]; vDo(e.shiftKey ? 'roll' : e.altKey ? 'shift' : 'slash', d); }
   else if (e.key === ' ') { e.preventDefault(); vDo('chain', '4'); }
   else if (e.key === 'r' || e.key === 'R') vDo('reset');
 }
@@ -2118,7 +2121,7 @@ function eDrop() {
 function eInfo() {
   const S = STAGES[E.layer], k = E.kind, big = k === 'large';
   const tag = k === 'enemy' ? '<span class="tag" style="color:#ffc840">金の目 ＝ 斬る</span>' : `<span class="tag" style="color:#ff7a3a">赤橙のふち ＝ よける</span>`;
-  const how = k === 'enemy' ? '押した方向へ刀を一閃。連撃の最後はとどめで光の粒に。' : big ? 'プレイヤーは反対側の壁を蹴って跳ぶ。' : 'プレイヤーは空中で身を翻してかわす。';
+  const how = k === 'enemy' ? '押した方向へ刀を一閃。連撃の最後はとどめで光の粒に。' : big ? 'プレイヤーは空中で身を翻して反対側へ移る。' : 'プレイヤーは空中で身を翻してかわす。';
   $('eInfo').innerHTML = `<div style="font-size:11px;color:var(--gold);letter-spacing:.2em">深界${S.kan}層　${S.name}</div><b>${nameOf(E.layer, k)}</b>${tag}
     <p>${k === 'enemy' ? ENEMY_DESC[S.enemy] : OBS_DESC[S.obs][big ? 1 : 0]}</p><p>${how}</p>`;
   document.querySelectorAll('#eList button').forEach(b => b.classList.toggle('on', +b.dataset.l === E.layer && b.dataset.k === k));
