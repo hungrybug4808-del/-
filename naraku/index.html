@@ -237,7 +237,7 @@ a.btn{text-decoration:none;display:inline-block}
   </div>
 </section>
 
-<div class="vlinks" id="vLink"><a class="vlink" href="#settings">設定 →</a><a class="vlink" href="#assets">素材確認モード →</a></div>
+<div class="vlinks" id="vLink"><a class="vlink" href="#settings">設定 →</a><a class="vlink" href="#player">プレイヤーだけ →</a><a class="vlink" href="#assets">素材確認モード →</a></div>
 
 <aside id="viewer" class="vpanel hidden">
   <h3>プレイヤーの動き</h3>
@@ -256,6 +256,7 @@ a.btn{text-decoration:none;display:inline-block}
   <label><input type="checkbox" id="vSpawn" checked> 敵・障害物も出す</label>
   <label><input type="checkbox" id="vRing" checked> 判定リング</label>
   <label><input type="checkbox" id="vFall" checked> 落下（壁が流れる）</label>
+  <label><input type="checkbox" id="vOnly"> プレイヤーだけ（背景・リング・敵を消す）</label>
   <h4>背景の層（敵・障害物もその層のもの）</h4><div class="row" id="vLayer"></div>
   <p class="hint">ドラッグで回転／ホイールで拡大／右ドラッグで移動<br>矢印キー：斬る　Shift＋矢印：身を翻す　Alt＋矢印：反対側へ移る<br>Space：連撃4体　R：リセット</p>
   <p class="hint"><a href="#assets">← 素材の一覧</a>　<a href="#title">ゲームへ戻る</a></p>
@@ -2205,7 +2206,17 @@ function vInit(mode, panel) {
   V.ctrl.target.set(0, 0.2, 0);
   camera.position.set(0.8, 1.2, 4.2);
 }
-function startViewer() {
+// プレイヤーだけを表示：背景・光の粒・リング・敵を消し、無地の背景に3方向の照明で見せる
+function vOnly(on) {
+  V.only = on;
+  world.visible = motes.obj.visible = abyssGlow.visible = !on; for (const g of globals) g.visible = !on;
+  for (const l of [eKey1, eRim, eFill]) l.visible = on;
+  if (on) { scene.background.set(0x2a2630); scene.fog.density = 0.004; vClear(); }
+  else if (TH) { scene.background.set(TH.fog); scene.fog.density = TH.fogD; }
+  V.ring = !on && $('vRing').checked; V.spawn = !on && $('vSpawn').checked;
+  for (const id of ['vRing', 'vSpawn', 'vFall']) $(id).disabled = on;
+}
+function startViewer(only = false) {
   vInit('player', 'viewer'); $('vNow').classList.remove('hidden');
   if (!V.builtP) { V.builtP = true;
   document.querySelectorAll('#viewer .dirs').forEach(box => {
@@ -2215,14 +2226,16 @@ function startViewer() {
   document.querySelectorAll('#viewer [data-one]').forEach(b => b.onclick = () => vDo(b.dataset.one));
   const seg = vSeg;
   seg($('vRate'), [[1, '×1'], [0.5, '×0.5'], [0.25, '×0.25'], [0.1, '×0.1']], 1, v => V.rate = v);
-  seg($('vLayer'), [...STAGES.map((S, i) => [i, S.kan]), [7, '底']], 0, v => { V.layer = v; vClear(); applyTheme(v); });
+  seg($('vLayer'), [...STAGES.map((S, i) => [i, S.kan]), [7, '底']], 0, v => { V.layer = v; vClear(); applyTheme(v); vOnly(V.only); });
   for (const [k, [label]] of Object.entries(V_CAMS)) { const b = document.createElement('button'); b.textContent = label; b.dataset.cam = k; b.onclick = () => vSetCam(k); $('vCam').appendChild(b); }
   $('vAuto').onchange = e => V.ctrl.autoRotate = e.target.checked;
   $('vSpawn').onchange = e => V.spawn = e.target.checked;
   $('vRing').onchange = e => V.ring = e.target.checked;
   $('vFall').onchange = e => V.fall = e.target.checked;
+  $('vOnly').onchange = e => vOnly(e.target.checked);
   }
   vSync('viewer', 'vRate'); document.querySelector('#vLayer button').click();
+  if (only) { $('vOnly').checked = true; vOnly(true); vSetCam('front'); }
   P.reset(); vSay('落下中', 'マントや髪が揺れ、体がゆっくり揺れる。ときどきまばたきや、首をかしげる');
   resize();
 }
@@ -2468,7 +2481,7 @@ function startScenery() {
 /* ---------- 素材確認モード（#assets）：作り直す順に並べる ---------- */
 const ASSET_STATE = { review: ['作り直し済み・確認待ち', '#ffe9b0'], ok: ['OK', '#9fe0a0'], todo: ['これから（いまは前のデザイン）', '#a39880'] };
 const ASSETS = [
-  { name: 'プレイヤー（探窟家）', note: '落下中・斬る・かわす・反対側へ移る・連撃・とどめ・やられる・まばたき・首をかしげる', state: 'review', open: () => goTool('viewer') },
+  { name: 'プレイヤー（探窟家）', note: '落下中・斬る・かわす・反対側へ移る・連撃・とどめ・やられる・まばたき・首をかしげる。背景などを消してプレイヤーだけで表示', state: 'review', open: () => goTool('player') },
   { name: '一層の敵（光る羽虫）', note: '飛ぶ・近づく・斬られる・とどめで散る', state: 'todo', open: () => goTool('bestiary', () => ePick(0, 'enemy')) },
   { name: '一層の障害物（木の根）', note: '小・大。回転する・通り過ぎる', state: 'todo', open: () => goTool('bestiary', () => ePick(0, 'small')) },
   { name: '一層の背景（苔と木の根の縦穴）', note: '壁・苔・木の根・結晶・光の粒・地上から差す光', state: 'todo', open: () => goTool('scenery', () => sLayer(0)) },
@@ -2478,7 +2491,7 @@ const ASSETS = [
 function goTool(h, after) {
   history.replaceState(null, '', '#' + h);
   exitTools();
-  ({ viewer: startViewer, bestiary: startBestiary, scenery: startScenery })[h]();
+  ({ viewer: () => startViewer(), player: () => startViewer(true), bestiary: startBestiary, scenery: startScenery })[h]();
   after?.();
 }
 function showAssets() {
@@ -2501,7 +2514,7 @@ function exitTools() {
   clearTimers(); vClear(); clearFX(); eDrop();
   for (const l of [eKey1, eRim, eFill]) l.visible = false;
   world.visible = motes.obj.visible = abyssGlow.visible = true; for (const g of globals) g.visible = true;
-  Object.assign(V, { rate: 1, fall: true, fallK: 1, boost: 0, ring: true, fog: true, layer: 0 });
+  Object.assign(V, { only: false, rate: 1, fall: true, fallK: 1, boost: 0, ring: true, fog: true, layer: 0 });
   $('fade').style.transition = 'none'; $('fade').style.opacity = 0; $('fade').style.background = '#000';
   P.reset(); themeKey = -1;
   camera.position.copy(CAM_POS); camera.lookAt(CAM_LOOK);
@@ -2516,6 +2529,7 @@ function route() {
   else if (h === 'scenery') startScenery();
   else if (h === 'settings') { showTitle(); showSettings('title'); }
   else if (h === 'assets') showAssets();
+  else if (h === 'player') startViewer(true);
   else showTitle();
 }
 addEventListener('hashchange', route);
