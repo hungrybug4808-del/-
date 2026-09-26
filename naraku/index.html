@@ -247,8 +247,6 @@ a.btn{text-decoration:none;display:inline-block}
   <h4>連撃（最後の1体はとどめ）</h4>
   <div class="row"><button data-chain="3">3体</button><button data-chain="4">4体（一周）</button><button data-chain="show">斬り見せ場（8体＋決め）</button></div>
   <h4>とどめ（大きく振り抜き → 衝撃波 → ヒットストップ）</h4><div class="row dirs" data-act="fin"></div>
-  <h4>そのほか</h4>
-  <div class="row"><button data-one="blink">まばたき</button><button data-one="tilt">首をかしげる</button><button data-one="tumble">やられる</button><button data-one="clear">層のクリア</button><button data-one="reset">落下中（リセット）</button></div>
   <h4>再生速度</h4><div class="row" id="vRate"></div>
   <h4>カメラ</h4><div class="row" id="vCam"></div>
   <label><input type="checkbox" id="vAuto"> 自動でまわす</label>
@@ -1279,228 +1277,259 @@ function updateApproach(items, apT) {
 }
 
 /* =====================================================================
-   8. 探窟家（なめらかで丸みのあるデフォルメ。2.5頭身、コードで組む）
+   8. 探窟家（剣の道を極めた剣士。ローポリで、関節で動く）
+   立ち姿で組み、頭から穴の底へ落ちる向きに倒して使う。
+   立ち姿の座標：+Y が頭、-Z が顔の向き、-X が左手側（刀を持つ手）。
+   倒したあとの画面：頭は奥（穴の底）、顔は画面の下、背中は画面の上、左手は画面の左。
    ===================================================================== */
 const P = (() => {
-  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); scene.add(root);
-  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.72, ...o });
-  const skin = M(0xf1c7a3, { roughness: 0.6, emissive: 0x3a1a0c, emissiveIntensity: 0.15 });
-  const hairM = M(0x3b2721, { roughness: 0.45 });
-  const cloakM = M(0xa5342b, { roughness: 0.85, side: THREE.DoubleSide });
-  const tunic = M(0x2f3d68, { roughness: 0.8 });
-  const leather = M(0x6a4428, { roughness: 0.55 });
-  const bootM = M(0x4b2f20, { roughness: 0.5 });
-  const brass = M(0xcfa54c, { metalness: 0.75, roughness: 0.32 });
-  const scarfM = M(0xe2aa3e, { roughness: 0.8 });
-  const eyeM = new THREE.MeshStandardMaterial({ color: 0x1b1320, roughness: 0.15, metalness: 0.1 });
-  const shineM = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const cheekM = new THREE.MeshBasicMaterial({ color: 0xff8f86, transparent: true, opacity: 0.4, depthWrite: false });
-  const lacquer = M(0x1e1618, { roughness: 0.3 });
-  const S = (r, w = 28, h = 20) => new THREE.SphereGeometry(r, w, h);
-  const CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 8, 18);
-  const add = (g, m, x, y, z, parent = body) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); parent.add(o); return o; };
+  const root = new THREE.Group(); scene.add(root);
+  const DIVE = -Math.PI / 2 + 0.42;   // 頭から落ちる。真上のカメラから背中が見えるよう、少しだけ傾ける
+  const rig = new THREE.Group(); rig.rotation.x = DIVE; root.add(rig);
+  const spinG = new THREE.Group(); rig.add(spinG);                                // 体の長い軸まわりの回転（身を翻す）
+  const F = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, flatShading: true, roughness: 0.85, ...o });
+  const coat = F(0x23283a), coatDark = F(0x171a26), hakama = F(0x2b2a30), skin = F(0xc99b7a, { roughness: 0.7 });
+  const hairM = F(0x121014), cloakM = F(0x3a3f4a, { side: THREE.DoubleSide }), obi = F(0x5a2a26), leather = F(0x3b2a20);
+  const steel = F(0xc9ced6, { metalness: 0.85, roughness: 0.28 }), tsuba = F(0x2a2522, { metalness: 0.6, roughness: 0.4 }), tsukaM = F(0x1a1a22), brass = F(0x9c7f45, { metalness: 0.6, roughness: 0.4 });
+  const mk = (geo, mat, parent, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const J = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+  // 胴の断面がすこし平たい、低い分割の円柱
+  const seg = (rTop, rBot, h, s = 6) => new THREE.CylinderGeometry(rTop, rBot, h, s).translate(0, -h / 2, 0);
 
-  /* ---- 胴体 ---- */
-  add(CAP(0.14, 0.12), tunic, 0, 0.25, 0).scale.set(1.06, 1, 0.86);
-  add(new THREE.TorusGeometry(0.143, 0.024, 10, 36).rotateX(Math.PI / 2), leather, 0, 0.16, 0).scale.set(1.06, 1, 0.86);
-  add(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 16).rotateX(Math.PI / 2), brass, 0, 0.16, -0.125);
-  add(CAP(0.045, 0.04), leather, 0.13, 0.12, -0.06).scale.set(1, 1, 0.7);          // 腰の小袋
-  add(new THREE.TorusGeometry(0.11, 0.048, 14, 32).rotateX(Math.PI / 2), scarfM, 0, 0.405, 0);   // えり巻き
-  const scarfTail = new THREE.Group(); scarfTail.position.set(0.05, 0.39, 0.1); body.add(scarfTail);
-  add(CAP(0.032, 0.12), scarfM, 0, -0.08, 0, scarfTail);
-
-  /* ---- 頭（首を支点に、かしげられる） ---- */
-  const head = new THREE.Group(); head.position.set(0, 0.43, 0); body.add(head);
-  const hc = new THREE.Group(); hc.position.set(0, 0.2, 0); head.add(hc);   // 頭の中心
-  const HR = 0.25;
-  add(S(HR, 44, 32), skin, 0, 0, 0, hc).scale.set(1, 0.95, 0.97);
-  // 頭の表面に置く（外向きの向きもそろえる）
-  const onHead = (obj, x, y, lift = 0.004, fwd = new THREE.Vector3(0, 0, 1)) => {
-    const zz = -Math.sqrt(Math.max(0, HR * HR - x * x - y * y)) * 0.97;
-    const n = new THREE.Vector3(x, y, zz).normalize();
-    obj.position.set(x, y, zz).addScaledVector(n, lift);
-    obj.quaternion.setFromUnitVectors(fwd, n);
-    hc.add(obj); return obj;
-  };
-  // 目：黒目がちで大きく、光のハイライト。まばたきは縦につぶす
-  const eyes = [];
-  for (const sx of [-1, 1]) {
-    const e = new THREE.Group();
-    onHead(e, sx * 0.093, -0.02, -0.012, new THREE.Vector3(0, 0, -1));
-    const ball = new THREE.Mesh(S(0.066, 28, 20), eyeM); ball.scale.set(0.8, 1.12, 0.42); e.add(ball);
-    const hl1 = new THREE.Mesh(S(0.019, 12, 8), shineM); hl1.position.set(-0.016, 0.03, -0.026); e.add(hl1);
-    const hl2 = new THREE.Mesh(S(0.009, 10, 6), shineM); hl2.position.set(0.017, -0.026, -0.026); e.add(hl2);
-    eyes.push(e);
-  }
-  for (const sx of [-1, 1]) onHead(new THREE.Mesh(new THREE.CircleGeometry(0.036, 24), cheekM), sx * 0.15, -0.085, 0.006, new THREE.Vector3(0, 0, -1));
-  const mouth = onHead(new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0055, 8, 16, Math.PI), M(0x7a2e2a)), 0, -0.1, 0.002, new THREE.Vector3(0, 0, -1));
-  mouth.rotateZ(Math.PI);
-  // 髪：後ろと頭頂をおおい、前髪は小さなふさ
-  const hairBack = new THREE.SphereGeometry(0.266, 44, 28, 1.5 * Math.PI + 1.15, TAU - 2.3, 0, Math.PI * 0.7);
-  add(hairBack, hairM, 0, 0.005, 0.004, hc).scale.set(1, 0.96, 0.98);
-  add(new THREE.SphereGeometry(0.263, 44, 14, 0, TAU, 0, Math.PI * 0.26), hairM, 0, 0.005, 0, hc).scale.set(1, 0.96, 0.98);
-  // 前髪：額をおおう1枚と、毛先の丸いふさ
-  const fringe = new THREE.Group(); hc.add(fringe);
-  add(new THREE.SphereGeometry(0.268, 44, 16, 1.5 * Math.PI - 1.25, 2.5, 0, Math.PI * 0.35), hairM, 0, 0.005, 0, fringe).scale.set(1, 0.96, 0.98);
-  const bangs = [];
-  for (let i = 0; i < 7; i++) {
-    const ph = 1.5 * Math.PI - 1.05 + i * 0.35, th = Math.PI * 0.35, r = 0.262;
-    const b = add(S(0.04, 16, 12), hairM, -r * Math.cos(ph) * Math.sin(th), r * Math.cos(th) * 0.96 - 0.012, r * Math.sin(ph) * Math.sin(th) * 0.98, fringe);
-    b.scale.set(1, 1.25, 0.8); bangs.push(b);
-  }
-  // 横の髪：ほおの横にたれる
-  const locks = [-1, 1].map(sx => { const g = new THREE.Group(); g.position.set(sx * 0.215, -0.02, -0.08); hc.add(g); const b = add(S(0.045, 16, 12), hairM, 0, -0.06, 0, g); b.scale.set(0.8, 1.9, 0.8); return g; });
-  // フード（顔のまわりを開けて、うしろにとがった先）
-  add(new THREE.SphereGeometry(0.305, 44, 28, 1.5 * Math.PI + 1.02, TAU - 2.04, 0, Math.PI * 0.8), cloakM, 0, 0.01, 0.015, hc).scale.set(1.02, 0.98, 1);
-  const hoodTip = new THREE.Group(); hoodTip.position.set(0, 0.2, 0.2); hoodTip.rotation.x = 1.05; hc.add(hoodTip);
-  add(new THREE.ConeGeometry(0.1, 0.22, 24).translate(0, 0.08, 0), cloakM, 0, 0, 0, hoodTip);
-  add(S(0.035, 12, 10), cloakM, 0, 0.2, 0, hoodTip);
-  // 額のランプ
-  const lampG = new THREE.Group(); onHead(lampG, 0, 0.19, -0.01, new THREE.Vector3(0, 0, -1));
-  add(new THREE.CylinderGeometry(0.048, 0.055, 0.06, 24).rotateX(Math.PI / 2), brass, 0, 0, -0.02, lampG);
-  const lampGlass = add(S(0.04, 20, 14), new THREE.MeshBasicMaterial({ color: hdr(0xfff0c0, 3) }), 0, 0, -0.05, lampG);
-  const lampGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: hdr(0xffe8b0, 0.9), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  lampGlow.scale.setScalar(0.5); lampGlass.add(lampGlow);
-  add(new THREE.TorusGeometry(0.255, 0.014, 8, 48, Math.PI * 0.9).rotateX(Math.PI / 2).rotateY(Math.PI * 0.55), leather, 0, 0.16, 0, hc).scale.set(1, 1, 0.97);
-  // ランプは前だけを照らす（自分の顔には当たらない）。広い光で近くの壁を、細い光で奥を照らし、遠くは霧に溶ける
-  const lamp = new THREE.SpotLight(0xffe2a8, 70, 34, 1.25, 0.85, 1.6); lamp.position.set(0, 0, -0.08); lampG.add(lamp);
+  /* ---- 骨組み（関節） 腰を回転の中心にする ---- */
+  const hips = J(spinG, 0, 0, 0);
+  const spine = J(hips, 0, 0.1, 0), chest = J(spine, 0, 0.24, 0), neck = J(chest, 0, 0.2, 0), head = J(neck, 0, 0.07, 0);
+  // 腰と脚
+  mk(new THREE.CylinderGeometry(0.15, 0.17, 0.2, 6), hakama, hips, 0, 0.02, 0).scale.z = 0.72;
+  mk(new THREE.CylinderGeometry(0.155, 0.155, 0.06, 6), obi, hips, 0, 0.1, 0).scale.z = 0.74;
+  const legs = [-1, 1].map(sx => {
+    const th = J(hips, sx * 0.09, -0.05, 0);
+    mk(seg(0.085, 0.07, 0.42), hakama, th).scale.z = 0.9;
+    const kn = J(th, 0, -0.42, 0);
+    mk(seg(0.062, 0.045, 0.4), hakama, kn);
+    const an = J(kn, 0, -0.4, 0);
+    mk(new THREE.BoxGeometry(0.08, 0.06, 0.2), leather, an, 0, -0.03, -0.05);
+    return { th, kn, an };
+  });
+  // 胴と胸
+  mk(seg(0.16, 0.15, 0.26), coat, spine, 0, 0.24, 0).scale.z = 0.72;
+  mk(seg(0.2, 0.16, 0.22), coat, chest, 0, 0.2, 0).scale.z = 0.66;
+  mk(new THREE.BoxGeometry(0.05, 0.3, 0.02), coatDark, chest, 0.03, 0.08, -0.108).rotation.z = 0.35;   // えりの合わせ
+  // 首と頭（顔は闇にまぎれる。フードの奥に目元だけ）
+  mk(seg(0.05, 0.055, 0.08), skin, neck, 0, 0.08, 0);
+  mk(new THREE.IcosahedronGeometry(0.11, 1), skin, head, 0, 0.1, 0).scale.set(0.9, 1.08, 0.98);
+  mk(new THREE.IcosahedronGeometry(0.117, 1), hairM, head, 0, 0.13, 0.018).scale.set(0.95, 1.0, 1.0);
+  const tail = J(head, 0, 0.12, 0.1);                 // 後ろで結んだ髪
+  mk(new THREE.ConeGeometry(0.035, 0.24, 5).translate(0, -0.12, 0), hairM, tail);
+  for (const sx of [-1, 1]) mk(new THREE.BoxGeometry(0.03, 0.008, 0.01), F(0x0a0a0c), head, sx * 0.04, 0.11, -0.1);
+  // フード（後ろに下ろしたもの）と、ひるがえるマント
+  mk(new THREE.IcosahedronGeometry(0.15, 0), cloakM, neck, 0, 0.02, 0.1).scale.set(1.3, 0.7, 0.9);
+  const cg = new THREE.PlaneGeometry(0.46, 0.95, 4, 6); cg.translate(0, -0.475, 0);
+  const cloak = mk(cg, cloakM, chest, 0, 0.2, 0.12);
+  const cBase = cg.attributes.position.array.slice();
+  // 額のランプ（穴の底の方を照らす）
+  const lampG = J(head, 0, 0.17, -0.09); lampG.rotation.x = 0.35;
+  mk(new THREE.BoxGeometry(0.06, 0.04, 0.04), brass, lampG);
+  const lampGlass = mk(new THREE.OctahedronGeometry(0.022, 0), new THREE.MeshBasicMaterial({ color: hdr(0xfff0c0, 3) }), lampG, 0, 0, -0.03);
+  const lampGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: hdr(0xffe8b0, 0.8), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  lampGlow.scale.setScalar(0.3); lampGlass.add(lampGlow);
+  const lamp = new THREE.SpotLight(0xffe2a8, 70, 34, 1.2, 0.85, 1.6); lamp.position.set(0, 0, -0.05); lampG.add(lamp);
   lamp.target.position.set(0, 0, -10); lampG.add(lamp.target);
-  const spot = new THREE.SpotLight(0xffe2a8, 40, 90, 0.45, 0.7, 1.4); spot.position.set(0, 0, -0.08); lampG.add(spot);
+  const spot = new THREE.SpotLight(0xffe2a8, 40, 90, 0.45, 0.7, 1.4); spot.position.set(0, 0, -0.05); lampG.add(spot);
   spot.target.position.set(0, 0, -30); lampG.add(spot.target);
-
-  /* ---- 腕と脚（丸い手と長靴） ---- */
-  const limb = (x, y, r, l, mat, end, endM, rz) => {
-    const piv = new THREE.Group(); piv.position.set(x, y, 0); piv.rotation.z = rz; body.add(piv);
-    add(CAP(r, l), mat, 0, -(l / 2 + r * 0.6), 0, piv);
-    const e = end(); e.material = endM; piv.add(e); return piv;
+  // 腕（肩・ひじ・手首）
+  const arm = sx => {
+    const sh = J(chest, sx * 0.2, 0.17, 0);
+    mk(new THREE.IcosahedronGeometry(0.06, 0), coat, sh);
+    mk(seg(0.055, 0.045, 0.28), coat, sh);
+    const el = J(sh, 0, -0.28, 0);
+    mk(seg(0.045, 0.035, 0.25), coat, el);
+    const wr = J(el, 0, -0.25, 0);
+    mk(new THREE.BoxGeometry(0.06, 0.08, 0.045), skin, wr, 0, -0.035, 0);
+    return { sh, el, wr };
   };
-  const armR = limb(0.165, 0.34, 0.046, 0.14, tunic, () => { const m = new THREE.Mesh(S(0.056, 20, 14)); m.position.y = -0.24; return m; }, leather, 1.15);
-  const armL = limb(-0.165, 0.34, 0.046, 0.14, tunic, () => { const m = new THREE.Mesh(S(0.056, 20, 14)); m.position.y = -0.24; return m; }, leather, -1.15);
-  const legR = limb(0.07, 0.08, 0.055, 0.11, tunic, () => { const m = new THREE.Mesh(S(0.066, 20, 14)); m.position.set(0, -0.2, -0.02); m.scale.set(1, 0.85, 1.35); return m; }, bootM, 0.25);
-  const legL = limb(-0.07, 0.08, 0.055, 0.11, tunic, () => { const m = new THREE.Mesh(S(0.066, 20, 14)); m.position.set(0, -0.2, -0.02); m.scale.set(1, 0.85, 1.35); return m; }, bootM, -0.25);
-
-  /* ---- 腰の刀（鞘）と、抜いた刀 ---- */
-  const sheath = new THREE.Group(); sheath.position.set(-0.15, 0.12, 0.07); sheath.rotation.z = -0.95; body.add(sheath);
-  add(CAP(0.022, 0.48), lacquer, 0, -0.1, 0, sheath);
-  const hilt = new THREE.Group(); hilt.position.y = 0.17; sheath.add(hilt);
-  add(new THREE.TorusGeometry(0.03, 0.009, 8, 20).rotateX(Math.PI / 2), brass, 0, 0, 0, hilt);
-  add(CAP(0.02, 0.09), lacquer, 0, 0.07, 0, hilt);
-  const swordPiv = new THREE.Group(); swordPiv.position.set(0, 0.25, -0.14); body.add(swordPiv);
+  const armL = arm(-1), armR = arm(1);
+  // 日本刀（左手）：刃は手のひらから手首の -Y の向きへ。反りは峰の側へ
+  const katana = J(armL.wr, 0, -0.04, 0);
+  mk(new THREE.BoxGeometry(0.03, 0.24, 0.03), tsukaM, katana, 0, 0.1, 0);
+  mk(new THREE.CylinderGeometry(0.045, 0.045, 0.012, 8), tsuba, katana, 0, -0.03, 0);
   const bladeShape = new THREE.Shape();
-  bladeShape.moveTo(0, -0.02); bladeShape.quadraticCurveTo(0.5, -0.03, 0.97, 0.01); bladeShape.lineTo(1.04, 0.04);
-  bladeShape.quadraticCurveTo(0.5, 0.03, 0, 0.022); bladeShape.lineTo(0, -0.02);
-  const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 16 }).translate(0.14, 0, -0.005);
-  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe6ebf2, metalness: 0.9, roughness: 0.18, emissive: new THREE.Color(1, 0.72, 0.2), emissiveIntensity: 0 });
-  add(bladeGeo, bladeMat, 0, 0, 0, swordPiv);
-  add(new THREE.TorusGeometry(0.035, 0.01, 8, 20).rotateY(Math.PI / 2), brass, 0.13, 0, 0, swordPiv);
-  add(CAP(0.02, 0.1).rotateZ(Math.PI / 2), lacquer, 0.05, 0, 0, swordPiv);
-  swordPiv.visible = false;
+  bladeShape.moveTo(-0.012, 0); bladeShape.lineTo(0.012, 0);
+  bladeShape.quadraticCurveTo(0.03, 0.4, 0.05, 0.72); bladeShape.lineTo(0.02, 0.8);
+  bladeShape.quadraticCurveTo(0.005, 0.4, -0.012, 0);
+  const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.006, bevelEnabled: false, curveSegments: 3 });
+  bladeGeo.rotateX(Math.PI); bladeGeo.rotateY(Math.PI / 2); bladeGeo.translate(0.003, -0.036, 0);
+  mk(bladeGeo, steel, katana);
 
-  /* ---- マント（布のように揺れる） ---- */
-  const cg = new THREE.PlaneGeometry(0.5, 0.66, 12, 16); cg.translate(0, -0.33, 0);
-  const cloak = new THREE.Mesh(cg, cloakM); cloak.position.set(0, 0.42, 0.12); body.add(cloak);
-  const base = cg.attributes.position.array.slice();
-  add(new THREE.TorusGeometry(0.13, 0.03, 10, 28, Math.PI).rotateX(Math.PI / 2), cloakM, 0, 0.42, 0.02).rotation.y = Math.PI;
+  root.scale.setScalar(1.45);
 
-  root.scale.setScalar(1.3);
-  const st = { act: null, sword: 0, swingSign: 1, flare: 0, lampK: 1, blinkT: 2, blinkP: 1, tilt: 0, tiltK: 0, tiltT: 3, settle: 0, cv: new THREE.Vector2(), lastP: new THREE.Vector2(), look: 0 };
-  function setAct(type, dir, dur, extra = {}) { st.act = { type, dir, t: 0, dur, ...extra }; }
+  /* ---- 姿勢 ----
+     腕は「腕の向き」「ひじの曲げ」「刃の向き」（どれも体の座標）で決め、関節の角度に直す。
+     そのほかは関節ごとの角度。キーフレームを補間して動かす。 */
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z).normalize();
+  const IDLE = () => ({
+    spin: 0, pelvX: 0.12, spineX: -0.05, spineY: 0, spineZ: 0, chestX: -0.08, neckX: 0.75, headX: 0.35, off: new THREE.Vector2(),
+    lArm: V3(-0.35, -0.8, -0.35), lBend: 0.55, blade: V3(-0.15, -0.75, 0.65),     // 刃は体に沿わせ、後ろ（足の方）へ
+    rArm: V3(0.55, -0.55, -0.35), rBend: 0.35,                                     // 右手は開いて姿勢を保つ
+    legSpread: 0.1, lKnee: 0.25, rKnee: 0.45, lHip: -0.1, rHip: 0.05, tuck: 0,
+  });
+  const copyPose = p => { const o = {}; for (const k in p) o[k] = p[k]?.clone ? p[k].clone() : p[k]; return o; };
+  const mixPose = (a, b, t) => {
+    const o = {};
+    for (const k in a) {
+      if (a[k]?.isVector3) o[k] = a[k].clone().lerp(b[k], t).normalize();
+      else if (a[k]?.isVector2) o[k] = a[k].clone().lerp(b[k], t);
+      else o[k] = a[k] + (b[k] - a[k]) * t;
+    }
+    return o;
+  };
+  const with_ = (base, ch) => { const o = copyPose(base); for (const k in ch) o[k] = ch[k]; return o; };
+  // 体の座標で、水平面の角度 φ（0：右 +X、-90：前 -Z、90：後ろ +Z、180：左 -X）の向き
+  const H = (deg, y = 0) => V3(Math.cos(deg * Math.PI / 180), y, Math.sin(deg * Math.PI / 180));
+
+  // 方向ごとの斬り方。キーフレームは [時刻, 姿勢の変更, イージング]
+  // 刀は左手だけで持つ。刀の側（左）へは順手の横薙ぎ、反対（右）へは体をひねって逆手側からの薙ぎ、
+  // 顔の側（前）へは上から袈裟に斬り下ろし、背中の側（後ろ）へは体ごと回って斬る
+  const SLASH = {
+    3: [ // 左
+      [0.05, { lArm: H(-40, -0.2), lBend: 1.3, blade: H(-10, 0.25), spineY: -0.45, chestX: 0.05 }],
+      [0.17, { lArm: H(185, -0.1), lBend: 0.05, blade: H(195, 0.05), spineY: 0.55, spineZ: 0.1, rArm: V3(0.8, -0.4, 0.2) }],
+      [0.36, { lArm: H(170, -0.3), lBend: 0.25, blade: H(150, -0.2), spineY: 0.45 }],
+    ],
+    1: [ // 右
+      [0.06, { lArm: H(165, -0.1), lBend: 0.3, blade: H(150, 0.15), spineY: 0.7, spineZ: -0.1, rArm: V3(0.6, -0.5, 0.5) }],
+      [0.19, { lArm: H(-20, -0.15), lBend: 0.1, blade: H(-5, 0.05), spineY: -0.75, spineZ: 0.12, off: new THREE.Vector2(0.18, 0), rArm: V3(-0.2, -0.6, 0.7) }],
+      [0.38, { lArm: H(10, -0.3), lBend: 0.35, blade: H(25, -0.3), spineY: -0.6 }],
+    ],
+    2: [ // 下（顔の側）
+      [0.06, { lArm: V3(-0.2, 0.9, -0.35), lBend: 0.6, blade: V3(0, 0.7, 0.7), chestX: 0.3, spineX: 0.15, neckX: 0.6 }],
+      [0.18, { lArm: V3(-0.05, -0.2, -1), lBend: 0.05, blade: V3(0.15, -0.55, -0.8), chestX: -0.45, spineX: -0.35, pelvX: 0.4, neckX: 0.95 }],
+      [0.38, { lArm: V3(-0.1, -0.55, -0.8), lBend: 0.3, blade: V3(0.25, -0.85, -0.3), chestX: -0.35, spineX: -0.25 }],
+    ],
+    0: [ // 上（背中の側）：長い軸まわりに半回転しながら、順手で横薙ぎ
+      [0.06, { lArm: H(-40, -0.2), lBend: 1.2, blade: H(-10, 0.25), spineY: -0.4, spin: -0.3 }],
+      [0.22, { lArm: H(185, -0.1), lBend: 0.05, blade: H(195, 0.05), spineY: 0.35, spin: Math.PI * 0.6, rArm: V3(0.8, -0.3, 0.3) }],
+      [0.42, { lArm: H(170, -0.3), lBend: 0.3, blade: H(160, -0.2), spineY: 0.3, spin: Math.PI * 0.55 }],
+    ],
+  };
+  // とどめ：大きく振りかぶって、全身で斬り抜ける
+  const BIG = d => SLASH[d].map(([t, ch], i) => [t * 1.35, i === 1 ? { ...ch, spin: (ch.spin || 0) + (d === 0 ? 0.6 : d === 1 ? -0.5 : d === 3 ? 0.5 : 0), off: new THREE.Vector2(0, 0) } : ch]);
+
+  const st = { act: null, pose: IDLE(), flare: 0, lampK: 1, cv: new THREE.Vector2(), last: new THREE.Vector2() };
+  // 動きを始める：いまの姿勢から、キーフレームを順にたどり、最後にふだんの姿勢へ戻る
+  function play(type, dir, keys, back, extra = {}) {
+    const from = copyPose(st.pose);
+    let prev = from; const frames = [[0, from]];
+    for (const [t, ch] of keys) { prev = with_(prev, ch); frames.push([t, prev]); }
+    const end = keys[keys.length - 1][0];
+    frames.push([end + back, with_(IDLE(), { spin: extra.spinEnd || 0 })]);   // 一回転したものは、その向きのまま戻る
+    st.act = { type, dir, t: 0, frames, dur: end + back, ...extra };
+  }
+  const idleAt = t => {
+    const p = IDLE();
+    p.spineZ += Math.sin(t * 0.9) * 0.04; p.pelvX += Math.sin(t * 1.3) * 0.04;
+    p.rArm = V3(0.55 + Math.sin(t * 1.7) * 0.06, -0.55, -0.35 + Math.sin(t * 2.1) * 0.08);
+    p.lKnee += Math.sin(t * 1.9) * 0.08; p.rKnee += Math.sin(t * 1.6 + 1) * 0.08;
+    return p;
+  };
+
+  // 腕の向き → 関節の角度
+  const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _qd = new THREE.Quaternion(), DOWN = new THREE.Vector3(0, -1, 0);
+  function setArm(a, dir, bend, bladeDir) {
+    spinG.updateMatrixWorld(true);
+    // 体の座標 → 胸の座標
+    spinG.getWorldQuaternion(_qa); chest.getWorldQuaternion(_qb);
+    const rel = _qa.invert().multiply(_qb), inv = rel.clone().invert();
+    const d = dir.clone().applyQuaternion(inv);
+    a.sh.quaternion.setFromUnitVectors(DOWN, d);
+    a.el.rotation.set(bend, 0, 0);
+    if (bladeDir) {
+      // 手首：刃（手首の -Y）が bladeDir を向くように
+      _qc.copy(a.sh.quaternion).multiply(_qd.setFromEuler(a.el.rotation));
+      // 刃の向き（手首の -Y）と、刃の平らな面の向き（手首の X ＝ 体の長い軸）で手首の向きを決める
+      const b = bladeDir.clone().applyQuaternion(inv), up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);
+      let nx = up.addScaledVector(b, -up.dot(b)); if (nx.lengthSq() < 1e-4) nx.set(1, 0, 0).addScaledVector(b, -b.x); nx.normalize();
+      const yh = b.clone().negate(), zh = new THREE.Vector3().crossVectors(nx, yh);
+      const want = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(nx, yh, zh));
+      a.wr.quaternion.copy(_qc.invert().multiply(want));
+    } else a.wr.rotation.set(0.3, 0, 0);
+  }
+  function apply(p) {
+    spinG.rotation.y = p.spin;
+    hips.rotation.set(p.pelvX, 0, 0); spinG.position.set(p.off.x, 0, p.off.y);   // 体の移動は回転の外側で（回っても向きが変わらない）
+    spine.rotation.set(p.spineX, p.spineY * 0.5, p.spineZ); chest.rotation.set(p.chestX, p.spineY * 0.5, 0);
+    neck.rotation.set(p.neckX, -p.spineY * 0.4, 0); head.rotation.set(p.headX, 0, 0);
+    const tk = p.tuck;
+    legs[0].th.rotation.set(p.lHip - tk * 1.4, 0, -p.legSpread); legs[0].kn.rotation.set(p.lKnee + tk * 1.8, 0, 0); legs[0].an.rotation.set(-0.2, 0, 0);
+    legs[1].th.rotation.set(p.rHip - tk * 1.4, 0, p.legSpread); legs[1].kn.rotation.set(p.rKnee + tk * 1.8, 0, 0); legs[1].an.rotation.set(-0.2, 0, 0);
+    setArm(armL, p.lArm, p.lBend, p.blade);
+    setArm(armR, p.rArm, p.rBend, null);
+  }
+  apply(st.pose);
+
   return {
-    root, body, lamp, spot, lampGlow, st,
-    reset() { st.act = null; st.sword = 0; st.flare = 0; st.lampK = 1; st.settle = 0; root.position.set(0, 0, 0); root.rotation.set(0, 0, 0); body.rotation.set(0, 0, 0); body.position.set(0, 0, 0); swordPiv.visible = false; root.visible = true; },
-    slash(dir, big = false) {
-      st.swingSign = -st.swingSign;
-      setAct(big ? 'big' : 'slash', dir, big ? 0.2 : 0.11, { a0: LANE_ANG[dir] + st.swingSign * (big ? 2.9 : 1.35), a1: LANE_ANG[dir] - st.swingSign * (big ? 2.9 : 1.35) });
-      st.sword = big ? 0.9 : 0.55;
+    root, lamp, spot, lampGlow, st,
+    reset() { st.act = null; st.flare = 0; st.lampK = 1; st.pose = IDLE(); root.position.set(0, 0, 0); root.rotation.set(0, 0, 0); root.visible = true; apply(st.pose); },
+    slash(dir, big = false) { const k = big ? BIG(dir) : SLASH[dir]; play(big ? 'big' : 'slash', dir, k, big ? 0.5 : 0.4); },
+    // 小さい障害物：障害物と反対へ体を外しながら、長い軸まわりに一回転して身を翻す
+    roll(dir) {
+      const a = LANE_ANG[dir], away = new THREE.Vector2(-Math.cos(a), -Math.sin(a)).multiplyScalar(0.7);   // 障害物と反対の向き。体の座標の (x, z)。画面の上は体の +Z
+      const sgn = dir === 1 ? 1 : dir === 3 ? -1 : (Math.random() < 0.5 ? 1 : -1);
+      const tight = { lArm: V3(-0.25, -0.9, 0.2), lBend: 1.2, blade: V3(0, -0.9, 0.35), rArm: V3(0.25, -0.9, 0.1), rBend: 1.3, legSpread: 0.02, lKnee: 0.15, rKnee: 0.15 };
+      play('roll', dir, [
+        [0.08, { ...tight, off: away.clone().multiplyScalar(0.6), spin: sgn * 1.2, pelvX: 0.3 }],
+        [0.26, { ...tight, off: away, spin: sgn * Math.PI * 2, pelvX: 0.2 }],
+        [0.4, { off: away.clone().multiplyScalar(0.4), spin: sgn * Math.PI * 2, rArm: V3(0.9, -0.2, -0.3), rBend: 0.1, legSpread: 0.25 }],   // 腕と脚を開いて体勢を整える
+      ], 0.35, { spinEnd: sgn * Math.PI * 2 });
     },
-    roll(dir) { setAct('roll', dir, 0.4, { sign: Math.random() < 0.5 ? 1 : -1 }); },
-    shift(dir) { setAct('shift', dir, 0.8, { sign: Math.random() < 0.5 ? 1 : -1 }); },
-    tumble() { setAct('tumble', 0, 99); },
+    // 大きい障害物：体を折って反対側へ大きく移り、ひねりながら一回転して、通り過ぎたら戻る
+    shift(dir) {
+      const a = LANE_ANG[dir], away = new THREE.Vector2(-Math.cos(a), -Math.sin(a)).multiplyScalar(1.15);
+      const sgn = Math.random() < 0.5 ? 1 : -1;
+      play('shift', dir, [
+        [0.1, { off: away.clone().multiplyScalar(0.5), tuck: 0.7, pelvX: 0.5, lArm: V3(-0.3, -0.85, 0.3), lBend: 1.3, blade: V3(0, -0.9, 0.35), rArm: V3(0.3, -0.8, 0.2), rBend: 1.4, spin: sgn * 0.9 }],
+        [0.3, { off: away, tuck: 0.25, pelvX: 0.2, spin: sgn * Math.PI * 2 }],
+        [0.5, { off: away, tuck: 0, rArm: V3(0.9, -0.25, -0.2), rBend: 0.15, legSpread: 0.3, spin: sgn * Math.PI * 2 }],
+      ], 0.45, { spinEnd: sgn * Math.PI * 2 });
+    },
+    tumble() { st.act = { type: 'tumble', t: 0, dur: 99 }; },
     flareUp() { st.flare = 1; },
-    blink() { st.blinkT = 0; },
-    tiltHead() { st.tilt = (Math.random() < 0.5 ? -1 : 1) * 0.3; st.tiltT = 1.3; },
     update(dt, t) {
-      // 落下中：体がゆっくり揺れ、手足が風にあおられる
-      let rz = Math.sin(t * 1.1) * 0.06, ry = Math.sin(t * 0.7) * 0.05, rx = 0, px = Math.sin(t * 0.9) * 0.05, py = Math.sin(t * 1.7) * 0.04;
-      let armRz = 1.15 + Math.sin(t * 3.1) * 0.08, armLz = -1.15 - Math.sin(t * 2.9) * 0.08, armRx = Math.sin(t * 2.2) * 0.12, armLx = -Math.sin(t * 2.4) * 0.12;
-      let legSp = 0.25, legRx = Math.sin(t * 2.3) * 0.22, legLx = -Math.sin(t * 2.1) * 0.22;
-      let hRz = 0, hRx = Math.sin(t * 1.3) * 0.04, hRy = Math.sin(t * 0.6) * 0.06, eyeY = 1;
-      // 首をかしげる（ときどき）
-      if (dt > 0) {
-        st.tiltT -= dt;
-        if (st.tiltT <= 0) { st.tilt = st.tilt ? 0 : (Math.random() < 0.5 ? -1 : 1) * 0.26; st.tiltT = st.tilt ? 1.3 : 4 + Math.random() * 4; }
-        st.tiltK += (st.tilt - st.tiltK) * (1 - Math.exp(-dt * 5));
-        // まばたき
-        st.blinkT -= dt;
-        if (st.blinkT <= 0) { st.blinkP = 0; st.blinkT = Math.random() < 0.2 ? 0.25 : 2 + Math.random() * 3.5; }
-        if (st.blinkP < 0.15) st.blinkP += dt;
-      }
-      hRz += st.tiltK;
-      if (st.blinkP < 0.15) eyeY = Math.min(eyeY, 1 - Math.sin(clamp(st.blinkP / 0.15, 0, 1) * Math.PI) * 0.93);
       const a = st.act;
-      if (a) {
-        a.t += dt; const p = clamp(a.t / a.dur, 0, 1);
-        if (a.type === 'slash' || a.type === 'big') {
-          const ang = lerp(a.a0, a.a1, easeOut(p));
-          swordPiv.visible = true; swordPiv.rotation.z = ang; armRz = ang + Math.PI / 2; armRx = 0;
-          rz += Math.sin(p * Math.PI) * 0.15 * -st.swingSign;
-          const la = LANE_ANG[a.dir]; hRy += -Math.cos(la) * 0.25; hRx += -Math.sin(la) * 0.2;   // 斬る方向を見る
-          eyeY = Math.min(eyeY, 0.72);   // きりっと目を細める
-          bladeMat.emissiveIntensity = 3 * (1 - p * 0.5);
-          if (p >= 1) { st.hold = (st.hold || 0) + dt; if (st.hold > 0.4) { st.act = null; st.hold = 0; } } else st.hold = 0;
-        } else if (a.type === 'roll') { // 小さい障害物：その場で身を翻す
-          rz += easeInOut(p) * TAU * a.sign;
-          const la = LANE_ANG[a.dir], k = Math.sin(p * Math.PI) * 0.6; px -= Math.cos(la) * k; py -= Math.sin(la) * k;
-          const tuck = Math.sin(p * Math.PI); armRz = lerp(armRz, 0.5, tuck); armLz = lerp(armLz, -0.5, tuck); legRx += tuck * 0.9; legLx += tuck * 0.9; legSp = 0.08;
-          eyeY = Math.min(eyeY, 1 - tuck * 0.8);
-          if (p >= 1) { st.act = null; st.settle = 0.5; }
-        } else if (a.type === 'shift') { // 大きい障害物：身を翻して反対側へ移り、通り過ぎたら戻る
-          const la = LANE_ANG[a.dir];
-          const out = p < 0.35 ? easeInOut(p / 0.35) : p < 0.68 ? 1 : 1 - easeInOut((p - 0.68) / 0.32);
-          px -= Math.cos(la) * out * 1.3; py -= Math.sin(la) * out * 1.3;
-          const sp = clamp(p / 0.4, 0, 1), tuck = Math.sin(sp * Math.PI);
-          rz += easeInOut(sp) * TAU * a.sign;
-          armRz = lerp(armRz, 0.5, tuck); armLz = lerp(armLz, -0.5, tuck); legRx += tuck * 0.9; legLx += tuck * 0.9;
-          eyeY = Math.min(eyeY, 1 - tuck * 0.8);
-          if (p >= 1) { st.act = null; st.settle = 0.5; }
-        } else if (a.type === 'tumble') { // 体勢を崩し、回転しながら闇へ
-          rx += a.t * 5.5; rz += a.t * 3.4; ry += a.t * 1.3;
-          root.position.z -= dt * (2 + a.t * 16); px += Math.sin(a.t * 3) * 0.3;
-          st.lampK = Math.max(0, 1 - a.t * 0.6); armRz = 2.6 + Math.sin(a.t * 9); armLz = -2.6 - Math.cos(a.t * 8);
-          legRx = Math.sin(a.t * 11) * 0.8; legLx = Math.cos(a.t * 10) * 0.8; eyeY = 0.12;
-        }
+      if (a && a.type === 'tumble') {
+        a.t += dt;
+        const p = idleAt(t); p.lBend = 0.2 + Math.sin(a.t * 9) * 0.6; p.rArm = V3(Math.sin(a.t * 7), 0.3, Math.cos(a.t * 6)); p.lKnee = 0.4 + Math.sin(a.t * 8) * 0.5; p.rKnee = 0.4 + Math.cos(a.t * 9) * 0.5; p.blade = V3(Math.sin(a.t * 5), -0.5, Math.cos(a.t * 4));
+        st.pose = p; apply(p);
+        rig.rotation.set(DIVE + a.t * 4.2, a.t * 1.5, a.t * 2.6);
+        root.position.z -= dt * (2 + a.t * 16);
+        st.lampK = Math.max(0, 1 - a.t * 0.6);
+      } else {
+        rig.rotation.set(DIVE, 0, 0);
+        let p;
+        if (a) {
+          a.t += dt;
+          const f = a.frames; let i = 1; while (i < f.length - 1 && f[i][0] < a.t) i++;
+          const [t0, p0] = f[i - 1], [t1, p1] = f[i];
+          const u = clamp((a.t - t0) / Math.max(1e-3, t1 - t0), 0, 1);
+          p = mixPose(p0, p1, i === 1 ? easeOut(u) : easeInOut(u));
+          if (a.t >= a.dur) { st.act = null; p = idleAt(t); }
+        } else p = idleAt(t);
+        st.pose = p; apply(p);
       }
-      // 身を翻したあと、少し体勢を整える
-      if (st.settle > 0 && dt > 0) st.settle = Math.max(0, st.settle - dt);
-      if (st.settle > 0) { const w = st.settle / 0.5; rz += Math.sin((1 - w) * 16) * 0.1 * w; rx += Math.sin((1 - w) * 12) * 0.07 * w; armRz += Math.sin((1 - w) * 14) * 0.25 * w; armLz -= Math.sin((1 - w) * 14) * 0.25 * w; }
-      if (!a || (a.type !== 'slash' && a.type !== 'big')) {
-        if (st.sword > 0) st.sword -= dt; else swordPiv.visible = false;
-        bladeMat.emissiveIntensity = Math.max(0, bladeMat.emissiveIntensity - dt * 8);
-      }
-      if (st.flare > 0.25) eyeY = Math.min(eyeY, 0.3);   // 層のクリア：うれしそうに目を細める
-      body.rotation.set(rx, ry, rz); body.position.set(px, py, 0);
-      head.rotation.set(hRx, hRy, hRz);
-      for (const e of eyes) e.scale.y = Math.max(0.08, eyeY);
-      armR.rotation.set(armRx, 0, armRz); armL.rotation.set(armLx, 0, armLz);
-      legR.rotation.set(legRx, 0, legSp); legL.rotation.set(legLx, 0, -legSp);
-      hilt.visible = !swordPiv.visible;
-      // 体の動きに遅れてついてくる（マント・髪・えり巻き）
-      if (dt > 0) { st.cv.set((px - st.lastP.x) / dt, (py - st.lastP.y) / dt).clampLength(0, 6); st.lastP.set(px, py); }
-      const cvx = st.cv.x, cvy = st.cv.y;
+      // マント：落下の風で足の方へなびき、背中から浮く
+      if (dt > 0) { st.cv.set((spinG.position.x - st.last.x) / dt, (spinG.position.z - st.last.y) / dt).clampLength(0, 8); st.last.set(spinG.position.x, spinG.position.z); }
       const pa = cg.attributes.position;
       for (let i = 0; i < pa.count; i++) {
-        const x = base[i * 3], y = base[i * 3 + 1], k = -y / 0.66, w = Math.sin(t * 9 + y * 9 + x * 6) * 0.05 + Math.sin(t * 14 + x * 11) * 0.02;
-        pa.setXYZ(i, x * (1 + k * 0.5) - cvx * k * 0.035, y * (1 - 0.22 * k) - cvy * k * 0.035, -0.1 * (x / 0.25) ** 2 * (1 - k * 0.5) + k * 0.22 + w * k);
+        const x = cBase[i * 3], y = cBase[i * 3 + 1], k = -y / 0.95;
+        const flap = Math.sin(t * 13 + y * 7 + x * 5) * 0.06 + Math.sin(t * 21 + x * 9) * 0.025;
+        pa.setXYZ(i, x * (1 + k * 0.35) - st.cv.x * k * 0.03, y, k * 0.18 + flap * k - st.cv.y * k * 0.03);
       }
       pa.needsUpdate = true; cg.computeVertexNormals();
-      bangs.forEach((b, i) => b.scale.y = 1.25 + Math.sin(t * 7 + i * 1.3) * 0.08);
-      locks.forEach((b, i) => { b.rotation.x = Math.sin(t * 5 + i * 2) * 0.18; b.rotation.z = Math.sin(t * 4 + i) * 0.1; });
-      scarfTail.rotation.x = 0.9 + Math.sin(t * 8) * 0.2; scarfTail.rotation.z = Math.sin(t * 6) * 0.25 - cvx * 0.05;
-      hoodTip.rotation.z = Math.sin(t * 4) * 0.08;
+      tail.rotation.set(-0.4 + Math.sin(t * 9) * 0.15, 0, Math.sin(t * 7) * 0.2);
       // ランプ
       if (dt > 0) st.flare = Math.max(0, st.flare - dt * 0.35);
       const L = st.lampK * (1 + st.flare * 18);
-      lamp.intensity = 70 * L; spot.intensity = 40 * L; lampGlow.scale.setScalar(0.35 + st.flare * 6);
+      lamp.intensity = 70 * L; spot.intensity = 40 * L; lampGlow.scale.setScalar(0.3 + st.flare * 5);
       lampGlass.material.color.copy(hdr(0xfff0c0, 3 + st.flare * 20));
     },
   };
@@ -2126,12 +2155,11 @@ const V = { mode: 'player', rate: 1, spawn: true, ring: true, fall: true, fallK:
 const vLead = () => D_SPAWN / (TH ? TH.speed : 20);   // ビューアでも背景と同じ速さ
 const V_CAMS = {
   game: ['ゲームの視点', CAM_POS.clone(), new THREE.Vector3(0, 0, 0)],
-  back: ['後ろ', new THREE.Vector3(0.8, 1.2, 4.2), new THREE.Vector3(0, 0.2, 0)],
-  front: ['前', new THREE.Vector3(0.6, 0.6, -4.2), new THREE.Vector3(0, 0.2, 0)],
-  face: ['顔のアップ', new THREE.Vector3(0.15, 0.95, -2.6), new THREE.Vector3(0, 0.8, 0)],
-  side: ['横', new THREE.Vector3(4.4, 0.4, 0.2), new THREE.Vector3(0, 0.2, 0)],
-  top: ['上', new THREE.Vector3(0, 4.6, 0.6), new THREE.Vector3(0, 0.2, 0)],
-  bottom: ['下', new THREE.Vector3(0, -4.6, -0.6), new THREE.Vector3(0, 0.2, 0)],
+  back: ['背中の側', new THREE.Vector3(0.4, 4.6, 0.8), new THREE.Vector3(0, 0, 0)],
+  front: ['顔の側', new THREE.Vector3(0.4, -4.6, 0.8), new THREE.Vector3(0, 0, 0)],
+  side: ['左手の側', new THREE.Vector3(-4.6, 0.4, 0.8), new THREE.Vector3(0, 0, 0)],
+  sideR: ['右手の側', new THREE.Vector3(4.6, 0.4, 0.8), new THREE.Vector3(0, 0, 0)],
+  top: ['頭の先から', new THREE.Vector3(0.5, 0.8, -5), new THREE.Vector3(0, 0, 0)],
 };
 function vSay(title, sub = '') { $('vNow').innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`; }
 function vReady() { initAudio(); if (P.st.act?.type === 'tumble') { P.reset(); G.speedK = V.fall ? 1 : 0; } }
@@ -2166,12 +2194,10 @@ const VACT = {
   },
   tumble() {
     vClear(); P.tumble(); SFX.miss(); G.shake = 0.5; vSay('やられる', '体勢を崩し、回転しながら闇に落ちていく');
-    fxLater(3.2, () => { if (P.st.act?.type === 'tumble') { P.reset(); vSay('落下中', 'マントや髪が揺れ、体がゆっくり揺れる。ときどきまばたきや、首をかしげる'); } });
+    fxLater(3.2, () => { if (P.st.act?.type === 'tumble') { P.reset(); vSay('落下中', '頭から落ちる。左手の刀を体に沿わせ、右手で姿勢を保つ'); } });
   },
   clear() { P.flareUp(); SFX.shine(); vSay('層のクリア', 'ランプが強く光り、うれしそうに目を細める'); },
-  blink() { P.blink(); vSay('まばたき'); },
-  tilt() { P.tiltHead(); vSay('首をかしげる'); },
-  reset() { vClear(); clearFX(); P.reset(); vSay('落下中', 'マントや髪が揺れ、体がゆっくり揺れる。ときどきまばたきや、首をかしげる'); },
+  reset() { vClear(); clearFX(); P.reset(); vSay('落下中', '頭から落ちる。左手の刀を体に沿わせ、右手で姿勢を保つ'); },
 };
 function vDo(name, arg) { vReady(); VACT[name](arg); }
 function vSetCam(key) {
@@ -2236,7 +2262,7 @@ function startViewer(only = false) {
   }
   vSync('viewer', 'vRate'); document.querySelector('#vLayer button').click();
   if (only) { $('vOnly').checked = true; vOnly(true); vSetCam('front'); }
-  P.reset(); vSay('落下中', 'マントや髪が揺れ、体がゆっくり揺れる。ときどきまばたきや、首をかしげる');
+  P.reset(); vSay('落下中', '頭から落ちる。左手の刀を体に沿わせ、右手で姿勢を保つ');
   resize();
 }
 
@@ -2481,7 +2507,7 @@ function startScenery() {
 /* ---------- 素材確認モード（#assets）：作り直す順に並べる ---------- */
 const ASSET_STATE = { review: ['作り直し済み・確認待ち', '#ffe9b0'], ok: ['OK', '#9fe0a0'], todo: ['これから（いまは前のデザイン）', '#a39880'] };
 const ASSETS = [
-  { name: 'プレイヤー（探窟家）', note: '落下中・斬る・かわす・反対側へ移る・連撃・とどめ・やられる・まばたき・首をかしげる。背景などを消してプレイヤーだけで表示', state: 'review', open: () => goTool('player') },
+  { name: 'プレイヤー（探窟家）', note: '落下中（頭から）・方向ごとの斬り方・身を翻す・反対側へ移る・連撃・とどめ。背景などを消してプレイヤーだけで表示', state: 'review', open: () => goTool('player') },
   { name: '一層の敵（光る羽虫）', note: '飛ぶ・近づく・斬られる・とどめで散る', state: 'todo', open: () => goTool('bestiary', () => ePick(0, 'enemy')) },
   { name: '一層の障害物（木の根）', note: '小・大。回転する・通り過ぎる', state: 'todo', open: () => goTool('bestiary', () => ePick(0, 'small')) },
   { name: '一層の背景（苔と木の根の縦穴）', note: '壁・苔・木の根・結晶・光の粒・地上から差す光', state: 'todo', open: () => goTool('scenery', () => sLayer(0)) },
@@ -2600,7 +2626,7 @@ function frame(now) {
 applyTheme(0); resize();
 route();
 requestAnimationFrame(frame);
-window.__naraku = { E, ePick, eSetMode, eCut, V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
+window.__naraku = { P, E, ePick, eSetMode, eCut, V, vDo, G, STAGES, buildSong, startStage, showMap, startEnding, SAVE, applyTheme, makeNoteObj, scene, P, THREE, show };
 </script>
 </body>
 </html>
