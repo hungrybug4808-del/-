@@ -96,7 +96,7 @@ function pose(u: Unit<OniRig>, T: Pose, dt: number): void {
 
 export const oni: UnitDef<OniRig> = {
   type: 'oni', name: '鬼', icon: '👹', sub: '陸・近接', cost: 3,
-  hp: 700, speed: 0.9, range: 1.6, aggro: 5, radius: 0.85, layer: 'land', hitAir: false, ranged: false, hitH: 1.4,
+  hp: 620, speed: 0.9, range: 1.6, aggro: 5, radius: 0.85, layer: 'land', hitAir: false, ranged: false, hitH: 1.4,
   barH: 3.2, barW: 1.3, ringR: 0.95, spawnT: 0.7, deathT: 2.4, smooth: 14,
   make,
   base: () => ({

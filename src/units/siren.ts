@@ -92,7 +92,7 @@ function apply(u: Unit<SirenRig>, dt: number): void {
 const V = new THREE.Vector3();
 export const siren: UnitDef<SirenRig> = {
   type: 'siren', name: 'セイレーン', icon: '🧜', sub: '海・遠距離', cost: 2,
-  hp: 150, speed: 1.5, range: 6, aggro: 7.5, radius: 0.45, layer: 'sea', hitAir: true, ranged: true, hitH: 0.5,
+  hp: 170, speed: 1.5, range: 6, aggro: 7.5, radius: 0.45, layer: 'sea', hitAir: true, ranged: true, hitH: 0.5,
   barH: 1.4, barW: 0.8, ringR: 0.55, spawnT: 0.7, deathT: 2.0, smooth: 10,
   make,
   base: () => ({
@@ -109,7 +109,7 @@ export const siren: UnitDef<SirenRig> = {
     if (u.st >= 0.8 && !u.fired.shot && ok && u.target) {
       u.fired.shot = 1;
       u.rig.mouth.getWorldPosition(V);
-      fireShot('note', V, u.target, 16, u.pos);
+      fireShot('note', V, u.target, 22, u.pos);
     }
   },
 };

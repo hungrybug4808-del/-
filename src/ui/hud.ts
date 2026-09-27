@@ -8,6 +8,8 @@ import { buddy } from '../buddy/buddy';
 import { DEF, HAND } from '../units/registry';
 import type { UnitType } from '../units/types';
 import { makePortraits } from './portraits';
+import { sfx } from '../audio/sound';
+import { stopTheme } from '../audio/music';
 
 // 画面上の表示（魔王城のHP・魔素・手札・メッセージ・勝敗）
 
@@ -42,6 +44,7 @@ for (const k of HAND) {
   b.innerHTML = portraits[k] ? `<img src="${portraits[k]}" alt="">` : `<span class="ic">${d.icon}</span>`;
   b.innerHTML += `<b>${SHORT[k] ?? d.name}</b><span class="cost">${d.cost}</span>`;
   b.addEventListener('click', () => {
+    sfx('click');
     hand.selected = hand.selected === k ? null : k;
     if (hand.selected) { setFlagMode(false); buddy.targeting = false; }
   });
@@ -103,5 +106,7 @@ export function updateHud(dt: number): void {
   if (game.over && game.endT > 2.0 && endEl.hidden) {
     endTitle.textContent = game.winner === 0 ? '勝利！' : '敗北…';
     endEl.hidden = false;
+    stopTheme();
+    sfx(game.winner === 0 ? 'win' : 'lose');
   }
 }

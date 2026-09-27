@@ -5,6 +5,7 @@ import { FIRE, addShake, dust, glow, ring, solid } from '../fx/effects';
 import { scene } from '../render/stage';
 import { aimPoint, alive, hurt, hurtBld, units } from '../battle/world';
 import type { Pose, Rig, Unit, UnitDef } from './types';
+import { sfx } from '../audio/sound';
 
 // ドラゴンライダー：オレンジのドラゴンに青いマントの騎士。S字の長い首、3本の指骨の翼、刃のような尻尾
 
@@ -360,11 +361,11 @@ function breatheFx(u: Unit<DragonRig>): void {
   }
 }
 
-const DPS = 55, CASTLE_DPS = 65;
+const DPS = 72, CASTLE_DPS = 85;
 
 export const dragon: UnitDef<DragonRig> = {
   type: 'dragon', name: 'ドラゴンライダー', icon: '🐉', sub: '空・ブレス', cost: 5,
-  hp: 420, speed: 1.1, range: 5, aggro: 7.5, radius: 1.3, layer: 'air', hitAir: true, ranged: true, hitH: 2.6,
+  hp: 560, speed: 1.1, range: 5, aggro: 7.5, radius: 1.3, layer: 'air', hitAir: true, ranged: true, hitH: 2.6,
   barH: 4.4, barW: 1.6, ringR: 1.4, spawnT: 1.2, deathT: 2.8, smooth: 8,
   make: makeDragon,
   base: () => ({
@@ -381,6 +382,7 @@ export const dragon: UnitDef<DragonRig> = {
     const tgt = u.target;
     if (!(u.st >= 0.8 && u.st < 2.1 && ok && tgt)) return;
     breatheFx(u);
+    sfx('breath', u.pos);
     if (tgt.isBld) hurtBld(tgt, CASTLE_DPS * dt);
     else {
       // ブレスは範囲攻撃。狙った相手と同じ場所（陸・海・空）の敵を焼く

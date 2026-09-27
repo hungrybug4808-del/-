@@ -91,7 +91,7 @@ function apply(u: Unit<TenguRig>, dt: number): void {
 const V = new THREE.Vector3();
 export const tengu: UnitDef<TenguRig> = {
   type: 'tengu', name: '天狗', icon: '🪭', sub: '空・遠距離', cost: 4,
-  hp: 300, speed: 1.5, range: 6.5, aggro: 8, radius: 0.6, layer: 'air', hitAir: true, ranged: true, hitH: 1,
+  hp: 380, speed: 1.5, range: 6.5, aggro: 8, radius: 0.6, layer: 'air', hitAir: true, ranged: true, hitH: 1,
   barH: 1.8, barW: 1.0, ringR: 0.7, spawnT: 1.0, deathT: 2.4, smooth: 12,
   make,
   base: () => ({
@@ -109,7 +109,7 @@ export const tengu: UnitDef<TenguRig> = {
     if (u.st >= 0.82 && !u.fired.shot && ok && u.target) {
       u.fired.shot = 1;
       u.rig.fanTip.getWorldPosition(V);
-      fireShot('wind', V, u.target, 30, u.pos);
+      fireShot('wind', V, u.target, 44, u.pos);
     }
   },
 };

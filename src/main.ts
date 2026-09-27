@@ -9,13 +9,23 @@ import { updateCamera } from './input/controls';
 import { resetBuddy, updateBuddy } from './buddy/buddy';
 import { showSelect, updateBuddyUI } from './ui/buddyUI';
 import { showWorlds } from './ui/worldUI';
+import { audio, initAudio, setMuted } from './audio/sound';
+import { stopTheme } from './audio/music';
 
 buildTerrain();
 buildSky();
 // 試合の前に、ワールド → バディの順に選ぶ（「もう一度」でも選び直す）
 const pick = (): void => showWorlds(showSelect);
 pick();
-onRestart(() => { restartBattle(); resetBuddy(); pick(); });
+onRestart(() => { stopTheme(); restartBattle(); resetBuddy(); pick(); });
+
+// 音：ブラウザは最初の操作まで鳴らせないので、最初のタップで準備する。右下のボタンで消せる
+document.addEventListener('pointerdown', initAudio);
+document.addEventListener('keydown', initAudio);
+const soundBtn = document.getElementById('soundBtn') as HTMLButtonElement;
+const showSound = () => { soundBtn.textContent = audio.muted ? '🔇' : '🔊'; soundBtn.setAttribute('aria-label', audio.muted ? '音を出す' : '音を消す'); };
+soundBtn.addEventListener('click', () => { setMuted(!audio.muted); showSound(); });
+showSound();
 
 let last = performance.now(), time = 0;
 function frame(now: number): void {

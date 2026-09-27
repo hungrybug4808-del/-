@@ -86,7 +86,9 @@ function column(x: number, zz: number): Col {
   // 台地の上（砂丘と、ところどころ岩の柱）
   const p = vn(x / 1.6, zz / 1.6, 41);
   if (p > 0.9) return rock(MESA_H + 1.5 + 3 * (p - 0.9) / 0.1);
-  return { h: q(MESA_H + 0.6 * vn(x / 2.5, zz / 2.5, 21)), mat: vn(x / 4, zz / 4, 23) > 0.5 ? B.SAND : B.DRY, sub: B.RED, strata, bio: Bio.DESERT };
+  // 砂丘（砂）は足が遅く、乾いた岩地はふつう
+  const sand = vn(x / 4, zz / 4, 23) > 0.5;
+  return { h: q(MESA_H + 0.6 * vn(x / 2.5, zz / 2.5, 21)), mat: sand ? B.SAND : B.DRY, sub: B.RED, strata, bio: sand ? Bio.DESERT : Bio.WASTE };
 }
 
 export const canyon: MapDef = {

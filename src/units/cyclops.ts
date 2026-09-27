@@ -5,6 +5,7 @@ import { addShake, dust, glow, ring, solid } from '../fx/effects';
 import { alive, bldAlive, bldDist, blds, canHit, hurt, hurtBld, units } from '../battle/world';
 import { groundY } from '../terrain/grid';
 import type { Pose, Rig, Unit, UnitDef } from './types';
+import { sfx } from '../audio/sound';
 
 // サイクロプス：約2頭身、水色の肌、黄色い虹彩に縦長の瞳の一つ目、ツノ1本、トゲ付き棍棒。
 // 巨体でとても遅い切り札。ごくまれに目からピンクのビームを撃つ
@@ -284,7 +285,7 @@ function attack(u: Unit<CyclopsRig>, dt: number, ok: boolean): void {
 
 export const cyclops: UnitDef<CyclopsRig> = {
   type: 'cyclops', name: 'サイクロプス', icon: '👁️', sub: '陸・近接', cost: 5,
-  hp: 1300, speed: 0.55, range: 2.0, aggro: 5.5, radius: 1.2, layer: 'land', hitAir: false, ranged: false, hitH: 2.2,
+  hp: 1300, speed: 0.65, range: 2.0, aggro: 5.5, radius: 1.2, layer: 'land', hitAir: false, ranged: false, hitH: 2.2,
   barH: 4.9, barW: 1.8, ringR: 1.4, spawnT: 0.8, deathT: 2.2, smooth: 14,
   make: makeCyclops,
   base: () => ({
@@ -296,6 +297,7 @@ export const cyclops: UnitDef<CyclopsRig> = {
     u.rig.beam.visible = false;
     if (u.life - (u.mem.beamAt ?? -BEAM_COOL) >= BEAM_COOL && Math.random() < BEAM_CHANCE) {
       u.atk = 'beam';
+      sfx('beam', u.pos);
       u.mem.beamAt = u.life;
     }
   },

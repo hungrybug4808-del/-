@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { rnd } from '../core/math';
-import { DEF, HAND } from '../units/registry';
+import { DEF } from '../units/registry';
 import { MAP } from '../terrain/generate';
 import type { Team, UnitType } from '../units/types';
 import { forts, resetBuildings, updateBuildings } from './buildings';
@@ -62,34 +62,43 @@ function cpuSeaSpots(): [number, number][] {
 }
 const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 
+// ---- CPU の考え ----
+// 魔素が足りればすぐ出し続ける（貯めてまとめて送るより、この試合では圧をかけ続ける方が強かった）。
+// 自陣に敵が入っていれば、一番奥の敵の少し手前（遠距離はもう少し後ろ）に出して迎え撃つ。
+// いなければ、重みつきで選んだ道（短い道ほど多め）に出す。海のモンスターは自陣の水に。
+
+/** 空いている場所を、(x, z) のまわりから探す（自陣の中だけ） */
+function findSpot(type: UnitType, x: number, z: number, r: number): [number, number] | null {
+  if (canSpawnAt(type, 1, x, z)) return [x, z];
+  for (let i = 0; i < 24; i++) {
+    const a = Math.random() * Math.PI * 2, d = r * Math.sqrt(Math.random());
+    const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+    if (canSpawnAt(type, 1, px, pz)) return [px, pz];
+  }
+  return null;
+}
+const CPU_POOL = Object.keys(DEF).filter(k => k !== 'kingslime') as UnitType[];
+
 function cpuThink(dt: number): void {
   cpu.t -= dt;
   if (cpu.t > 0) return;
-  cpu.t = 0.7;
-  if (!cpu.next) {
-    // 空の敵が多ければ、空を撃てる遠距離を増やす
-    const airFoes = units.filter(u => u.team === 0 && u.air && alive(u)).length;
-    cpu.next = airFoes >= 2 && Math.random() < 0.55 ? pick<UnitType>(['archer', 'centaur', 'siren', 'tengu']) : pick(HAND);
+  cpu.t = 0.5;
+  if (!cpu.next) cpu.next = pick(CPU_POOL);
+  const type = cpu.next, d = DEF[type];
+  if (cpu.mana < d.cost || Math.random() > 0.6) return;
+  const foes = units.filter(u => u.team === 0 && alive(u) && u.state !== 'spawn' && u.pos.z > 0);
+  const lead = foes.length ? foes.reduce((a, u) => (u.pos.z > a.pos.z ? u : a)) : null;
+  let at: [number, number] | null = null;
+  if (lead && d.layer !== 'sea') at = findSpot(type, lead.pos.x, Math.max(0.6, lead.pos.z + (d.ranged ? 4.5 : 2.5)), 2.5);
+  const spots = MAP.def.cpuSpawns;
+  for (let tries = 0; tries < 30 && !at; tries++) {
+    let r = Math.random() * spots.reduce((a, s) => a + s[4], 0), sp = spots[0];
+    if (d.layer === 'land') for (const s of spots) { r -= s[4]; if (r <= 0) { sp = s; break; } }
+    const p: [number, number] = d.layer === 'sea' ? pick(cpuSeaSpots()) : [rnd(sp[0], sp[1]), rnd(sp[2], sp[3])];
+    if (canSpawnAt(type, 1, p[0], p[1])) at = p;
   }
-  const d = DEF[cpu.next], cost = d.cost;
-  if (cpu.mana >= cost && Math.random() < 0.6) {
-    const n = cost === 1 ? Math.min(2, Math.floor(cpu.mana)) : 1;
-    for (let tries = 0; tries < 30; tries++) {
-      // 陸はワールドの3本の道のどれかの自陣側、空は最初の場所、海は自陣の海
-      const spots = MAP.def.cpuSpawns;
-      let r = Math.random() * spots.reduce((a, s) => a + s[4], 0), sp = spots[0];
-      if (d.layer === 'land') for (const s of spots) { r -= s[4]; if (r <= 0) { sp = s; break; } }
-      const [x, z] = d.layer === 'sea' ? pick(cpuSeaSpots()) : [rnd(sp[0], sp[1]), rnd(sp[2], sp[3])];
-      if (!canSpawnAt(cpu.next, 1, x, z)) continue;
-      for (let i = 0; i < n; i++) {
-        const sx = x + (i - 1) * 0.8, sz = z + rnd(-0.3, 0.3), ok = canSpawnAt(cpu.next, 1, sx, sz);
-        spawnUnit(cpu.next, 1, ok ? sx : x, ok ? sz : z);
-        cpu.mana -= cost;
-      }
-      cpu.next = null;
-      break;
-    }
-  }
+  if (at) { spawnUnit(type, 1, at[0], at[1]); cpu.mana -= d.cost; }
+  cpu.next = null;
 }
 
 export type SpawnResult = 'ok' | 'mana' | 'half' | 'land' | 'sea';

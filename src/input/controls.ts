@@ -10,6 +10,7 @@ import { pickables } from '../world/terrain';
 import { hand, setFlagMode, toast } from '../ui/hud';
 import { buddy, useSkill } from '../buddy/buddy';
 import { buddyUI } from '../ui/buddyUI';
+import { sfx } from '../audio/sound';
 
 // カメラ操作と、地面タップでの出撃
 //  - 1本指ドラッグ / マウス左ドラッグ：視点を動かす
@@ -147,6 +148,7 @@ function tap(e: PointerEvent): void {
   const p = groundHit(e);
   if (!p) return;
   const res = playerSpawn(hand.selected, p.x, p.z, p.y);
+  if (res !== 'ok') sfx('deny');
   if (res === 'half') toast('自陣（光る線より手前）に置いてください');
   else if (res === 'land') toast('陸のモンスターは、立てる地面に置いてください');
   else if (res === 'sea') toast('海のモンスターは、海や川の水の上に置いてください');

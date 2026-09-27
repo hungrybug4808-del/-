@@ -4,6 +4,7 @@ import { glow } from '../fx/effects';
 import { scene } from '../render/stage';
 import type { Target } from '../units/types';
 import { aimPoint, alive, bldAlive, hurt, hurtBld } from './world';
+import { sfx } from '../audio/sound';
 
 // 飛び道具。狙いを追いかけて飛ぶ（必中）
 //  arrow：山なりに飛ぶ矢（弓兵・ケンタウロス・砦）
@@ -44,6 +45,7 @@ const V = new THREE.Vector3();
 const FWD = new THREE.Vector3(0, 0, 1);
 
 export function fireShot(kind: ShotKind, from: THREE.Vector3, target: Target, dmg: number, shooter: { x: number; z: number }): void {
+  sfx(kind === 'note' ? 'note' : kind === 'wind' ? 'wind' : 'arrow', shooter);
   const g = new THREE.Group();
   for (const [geo, m, x, y, z] of PARTS[kind]) {
     const me = new THREE.Mesh(geo, m);

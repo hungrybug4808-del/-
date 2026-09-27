@@ -11,6 +11,7 @@ import { TEAM, alive, bldAlive, game, hdist, hooks, units } from '../battle/worl
 import type { Unit } from '../units/types';
 import { BUDDIES, type BuddyDef, type PlanKind } from './data';
 import { applyBuddy, buddyPose, makeBuddy, type BuddyAnim, type BuddyId, type BuddyRig } from './models';
+import { sfx } from '../audio/sound';
 
 // バディ：試合前に1人選ぶ相棒。ゲージが溜まるとスキルを使え、戦況を見て作戦（旗）を提案する
 
@@ -97,6 +98,7 @@ export function useSkill(x?: number, z?: number): boolean {
   if (rig) sparkle({ x: rig.root.position.x, y: rig.root.position.y + 1.2, z: rig.root.position.z }, 24, [0xffd34d, 0xffffff, 0xa98bff], 1.8);
   talk(def.lines.cast, 3);
   setAnim('cast');
+  sfx('skill');
   return true;
 }
 

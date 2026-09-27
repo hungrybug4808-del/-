@@ -1,5 +1,8 @@
 import { BUDDIES, approvePlan, buddy, chooseBuddy, dismissPlan, skillReady, useSkill } from '../buddy/buddy';
 import { game } from '../battle/world';
+import { MAP } from '../terrain/generate';
+import { initAudio } from '../audio/sound';
+import { playTheme } from '../audio/music';
 
 // バディの画面：試合前の選択、ゲージとスキル、提案の吹き出し
 
@@ -20,6 +23,8 @@ for (const b of BUDDIES) {
     chooseBuddy(b.id);
     selectEl.hidden = true;
     game.phase = 'battle';
+    initAudio();
+    playTheme(MAP.def.id);
   });
   listEl.appendChild(el);
 }

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { cl } from '../core/math';
 import { addShake } from '../fx/effects';
 import type { Building, Target, Team, Unit, UnitState } from '../units/types';
+import { sfx } from '../audio/sound';
 
 // 戦場の共有状態と、ダメージ・距離などの基本ルール
 
@@ -118,7 +119,9 @@ export function hurt(e: Unit, dmg: number): void {
   if (!alive(e)) return;
   e.hp -= dmg;
   e.flash = 1;
+  sfx(dmg >= 40 ? 'heavy' : 'hit', e.pos);
   if (e.hp <= 0) {
+    sfx('death', e.pos);
     e.hp = 0;
     setState(e, 'dead');
     hooks.onDeath(e);
@@ -128,7 +131,9 @@ export function hurtBld(b: Building, dmg: number): void {
   if (b.hp <= 0) return;
   b.hp = Math.max(0, b.hp - dmg);
   b.flash = 1;
+  sfx('bldHit', b.pos);
   if (b.hp > 0) return;
+  sfx('collapse');
   b.fallT = 0;
   addShake(b.kind === 'castle' ? 0.6 : 0.35);
   if (b.kind === 'fort') notify.toast(b.team === 0 ? '自軍の砦が落とされた！' : '敵の砦を落とした！');

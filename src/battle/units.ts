@@ -14,6 +14,7 @@ import {
 } from '../terrain/grid';
 import { FlowField, canStep, findPath, walkable } from '../terrain/nav';
 import { laneAt, laneMask, type Lane } from '../terrain/lanes';
+import { sfx } from '../audio/sound';
 import {
   TEAM, aimPoint, alive, bldAlive, bldDist, bldPoint, blds, buffed, canHit, game, hdist, hooks, inRange, notify, rangeOf, setState, units, validTarget,
 } from './world';
@@ -58,6 +59,7 @@ export function spawnUnit(type: UnitType, team: Team, x: number, z: number): Uni
   };
   units.push(u);
   // 召喚：魔法陣の輪と光の粒
+  sfx('summon', { x, z });
   ring({ x, y, z }, TEAM[team].color, d.ringR * 2, 0.5);
   sparkle({ x, y: y + (air ? 2.6 : 0.3), z }, 18, MAGIC);
   return u;
@@ -245,12 +247,14 @@ function moveToward(u: Unit, tx: number, tz: number, dt: number, field?: FlowFie
   }
   const dx = wx - u.pos.x, dz = wz - u.pos.z, L = Math.hypot(dx, dz);
   if (L < 1e-4) return;
-  const step = Math.min(L, u.d.speed * speedMul(u) * dt);
+  const step = Math.min(L, u.d.speed * MOVE_MUL * speedMul(u) * dt);
   if (u.air) { u.pos.x += (dx / L) * step; u.pos.z += (dz / L) * step; }
   else tryMove(u, u.pos.x + (dx / L) * step, u.pos.z + (dz / L) * step);
   u.yaw = Math.atan2(dx, dz);
 }
 
+/** 全体の歩く速さ（マップが広いので、各モンスターの速さに掛けて少し速くする） */
+export const MOVE_MUL = 1.2;
 /** 沼地と砂漠では陸の移動が遅くなる */
 export const SLOW_BIOME_MUL = 0.7;
 function speedMul(u: Unit): number {

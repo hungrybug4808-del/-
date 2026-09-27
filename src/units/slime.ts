@@ -105,7 +105,7 @@ export const slime: UnitDef<SlimeRig> = {
 const KING_AREA = 2.3, KING_DMG = 55, KING_BLD = 80;
 export const kingslime: UnitDef<SlimeRig> = {
   type: 'kingslime', name: 'キングスライム', icon: '👑', sub: '陸・近接', cost: 8,
-  hp: 1000, speed: 0.8, range: 1.8, aggro: 5.5, radius: 1.2, layer: 'land', hitAir: false, ranged: false, hitH: 1.1,
+  hp: 1200, speed: 0.8, range: 1.8, aggro: 5.5, radius: 1.2, layer: 'land', hitAir: false, ranged: false, hitH: 1.1,
   barH: 3.1, barW: 1.6, ringR: 1.4, spawnT: 1.2, deathT: 1.8, smooth: 14,
   make: makeWith('kingslime', KING, 0.17),
   base, pose: poseFor(true), apply,

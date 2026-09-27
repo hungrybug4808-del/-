@@ -8,6 +8,7 @@ import { groundY, surfaceY } from '../terrain/grid';
 import type { Layer, Team, Unit } from '../units/types';
 import { BAR_BG, BAR_GEO } from './bars';
 import { TEAM, alive, hdist, notify, units } from './world';
+import { sfx } from '../audio/sound';
 
 // 竜脈：上にしばらくいると占領でき、占領中は魔素の回復が速くなる
 
@@ -119,6 +120,7 @@ export function updateVeins(dt: number): void {
     else if ((v.owner === 0 && v.meter <= 0) || (v.owner === 1 && v.meter >= 0)) v.owner = -1;
     const own = v.owner;
     if (own !== prev) {
+      if (own === 0) sfx('vein'); else if (prev === 0) sfx('veinLost');
       if (own !== -1) {
         ring(v.pos, TEAM[own].color, 3, 0.6);
         sparkle({ x: v.pos.x, y: v.pos.y + 0.5, z: v.pos.z }, 24, [TEAM[own].color, 0xffffff], 1.5);

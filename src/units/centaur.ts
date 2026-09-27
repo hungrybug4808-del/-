@@ -116,7 +116,7 @@ function post(u: Unit<CentaurRig>): void {
 
 export const centaur: UnitDef<CentaurRig> = {
   type: 'centaur', name: 'ケンタウロス', icon: '🐎', sub: '陸・遠距離', cost: 3,
-  hp: 220, speed: 2.2, range: 6, aggro: 8, radius: 0.55, layer: 'land', hitAir: true, ranged: true, hitH: 1.0,
+  hp: 300, speed: 2.2, range: 6, aggro: 8, radius: 0.55, layer: 'land', hitAir: true, ranged: true, hitH: 1.0,
   barH: 2.0, barW: 1.0, ringR: 0.7, spawnT: 0.7, deathT: 2.0, smooth: 14,
   make,
   base: () => ({
@@ -130,7 +130,7 @@ export const centaur: UnitDef<CentaurRig> = {
     if (u.st >= 0.72 && !u.fired.shot && ok && u.target) {
       u.fired.shot = 1;
       u.rig.hand.getWorldPosition(V);
-      fireShot('arrow', V, u.target, 20, u.pos);
+      fireShot('arrow', V, u.target, 32, u.pos);
     }
   },
 };
