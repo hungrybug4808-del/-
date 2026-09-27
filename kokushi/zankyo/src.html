@@ -618,7 +618,7 @@ function hitEnemy(n, dt, k){
   } else {
     count += 1; act(knight, k === 'R' ? 'slashR' : k === 'L' ? 'slashL' : 'slashC');
     if (n.obj){ burst.emit(n.obj.position, [0x1c2848, 0x2c3c66, 0x9ff8ff, 0xcff6ff, 0xffffff], 45, 4.2, new THREE.Vector3((n.obj.position.x - kx) * 1.5, 1, -2), .09, .9); slope.remove(n.obj); n.obj = null; }
-    if (k !== 'U') arcs.add(new THREE.Vector3(kx, 1.4, 0), 2.0, Math.PI * .6, new THREE.Euler(Math.PI / 2, 0, k === 'R' ? -Math.PI * .1 : Math.PI * .5), 0x8a9ab0, .2, .25, .04);
+    if (k !== 'U') arcs.add(new THREE.Vector3(kx, 1.4, 0), 2.0, Math.PI * .6, new THREE.Euler(Math.PI / 2, 0, k === 'R' ? -Math.PI * .1 : Math.PI * .5), 0x2a3444, .14, .15, .03);   // 輪は暗く短く（次に来る敵を隠さない）
     hitStop = .045; shake = .07;
   }
   $('cnt').textContent = count;
@@ -716,7 +716,7 @@ function frame(nowMs){
       if (n.rings){ const d = Math.abs(n.T - now), near = Math.max(0, 1 - d / .8), inWin = d <= JUDGE; n.rings.forEach(r => { r.material.opacity = n.judged ? 0 : .45 + .5 * near; r.material.color.setHex(inWin ? 0xff5a5a : 0xffd36a); const sc = 1 + .6 * Math.min(1, d / .8); r.scale.set(sc, sc, sc); }); }
       if (!n.judged){
         if (n.kind === 'E' || n.kind === 'F'){
-          if (mode === 'demo' && now >= n.T){ const d = n.kind === 'F' ? 0 : n.lane - laneAt(n.T), k = d === 0 ? 'U' : d === -1 ? 'L' : d === 1 ? 'R' : null; if (k) hitEnemy(n, 0, k); else n.judged = true; }   // デモは「その拍にいたレーン」から斬る
+          if (mode === 'demo' && ac.currentTime >= t0 + n.T - .06){ const d = n.kind === 'F' ? 0 : n.lane - laneAt(n.T), k = d === 0 ? 'U' : d === -1 ? 'L' : d === 1 ? 'R' : null; if (k) hitEnemy(n, 0, k); else n.judged = true; }   // デモは拍の少し前に、その拍にいるはずのレーンから斬り、斬った音を拍ちょうどに予約する
           else if (now > n.T + JUDGE){ if (n.kind === 'F' ? kLane >= 1 && kLane <= 3 : n.lane === kLane) miss(n, '被弾'); else n.judged = true; }
         } else if (n.kind === 'J'){
           if (mode === 'demo' && now >= n.T)jump(n.T);
