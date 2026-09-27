@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>星奏スライダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@500;800&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#07061a;--ink:#f1f0ff;--dim:#9b98c8;--cyan:#4ff3ff;--pink:#ff5fd2;--gold:#ffd166;--green:#6dff9e;--panel:rgba(14,12,40,.86);--line:rgba(150,140,255,.28)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:"M PLUS 1p","Hiragino Sans",system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+.num{font-family:Orbitron,"M PLUS 1p",sans-serif;font-variant-numeric:tabular-nums}
+
+/* HUD */
+#hud{position:fixed;inset:0;pointer-events:none}
+#hud .tl{position:absolute;left:16px;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;align-items:center;gap:10px}
+#hud .tl .jk{width:44px;height:44px;border-radius:6px}
+#hud .tl b{display:block;font-size:15px}
+#hud .tl small{font-size:11px;color:var(--dim);letter-spacing:.1em}
+#hud .tr{position:absolute;right:16px;top:calc(env(safe-area-inset-top,0px) + 10px);text-align:right}
+#score{font-size:30px;font-weight:800;letter-spacing:.04em;text-shadow:0 0 14px rgba(79,243,255,.5)}
+.gauge{width:220px;height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;margin-left:auto;margin-top:4px;position:relative}
+.gauge i{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b5cff,#ff5fd2,#ffd166)}
+.gauge u{position:absolute;left:70%;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.7}
+#prog{position:absolute;left:0;top:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--pink));width:0}
+#hint{transition:opacity 1s;position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);transform:translateX(-50%);font-size:12px;color:var(--dim);letter-spacing:.1em;white-space:nowrap}
+
+/* screens */
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(ellipse at center,rgba(7,6,26,.35),rgba(7,6,26,.88))}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#select .panel{display:grid;grid-template-columns:auto 1fr;gap:22px;padding:24px;width:min(920px,100%);max-height:100%;overflow:auto}
+#jacket{width:min(260px,34vw);aspect-ratio:1;border-radius:10px;box-shadow:0 0 30px rgba(255,95,210,.35)}
+.song h1{font-size:clamp(24px,4vw,38px);font-weight:800;letter-spacing:.06em}
+.song .meta{color:var(--dim);font-size:13px;margin-top:4px}
+.logo{font-family:Orbitron,sans-serif;font-weight:800;letter-spacing:.3em;font-size:12px;color:var(--cyan);margin-bottom:6px}
+.diffs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 12px}
+.diff{border-radius:10px;padding:10px 8px;text-align:center;border:2px solid transparent;background:rgba(255,255,255,.05);transition:transform .12s,background .12s}
+.diff .n{font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:.14em;font-weight:800}
+.diff .lv{font-family:Orbitron,sans-serif;font-size:30px;font-weight:800;line-height:1.1}
+.diff .bs{font-size:11px;color:var(--dim);min-height:2.6em;line-height:1.3}
+.diff.on{transform:translateY(-3px);background:rgba(255,255,255,.12)}
+.d0{color:#6dff9e}.d1{color:#ffd166}.d2{color:#ff6b8b}.d3{color:#c68bff}
+.diff.on.d0{border-color:#6dff9e}.diff.on.d1{border-color:#ffd166}.diff.on.d2{border-color:#ff6b8b}.diff.on.d3{border-color:#c68bff}
+.opts{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--dim)}
+.opt{display:flex;align-items:center;gap:6px}
+.opt button{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.08);color:var(--ink);font-weight:800}
+.opt b{min-width:3.6em;text-align:center;color:var(--ink)}
+.opt .tog{width:auto;padding:0 10px}
+.go{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+.btn{padding:12px 22px;border-radius:10px;font-weight:800;letter-spacing:.12em;background:linear-gradient(135deg,#ff5fd2,#8b5cff);box-shadow:0 6px 24px rgba(255,95,210,.35)}
+.btn.sub{background:rgba(255,255,255,.08);box-shadow:none}
+.btn small{font-size:10px;opacity:.7;margin-left:6px;letter-spacing:0}
+.how{margin-top:14px;font-size:12px;color:var(--dim);line-height:1.8}
+.how kbd{font-family:Orbitron,sans-serif;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--ink)}
+#calMsg{font-size:12px;color:var(--gold);min-height:1.6em;margin-top:6px}
+
+#result .panel{padding:24px 28px;width:min(640px,100%);text-align:center}
+#rRank{font-family:Orbitron,sans-serif;font-size:clamp(60px,12vw,110px);font-weight:800;line-height:1;background:linear-gradient(180deg,#fff,#ffd166 50%,#ff5fd2);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(255,209,102,.4))}
+#rScore{font-size:clamp(34px,6vw,50px);font-weight:800;margin:4px 0}
+#rBadges{min-height:30px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.badge{font-family:Orbitron,sans-serif;font-size:13px;font-weight:800;letter-spacing:.14em;padding:5px 12px;border-radius:999px;border:2px solid currentColor}
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.rgrid div{background:rgba(255,255,255,.05);border-radius:8px;padding:8px 4px}
+.rgrid small{display:block;font-size:10px;letter-spacing:.12em;font-family:Orbitron,sans-serif}
+.rgrid b{font-size:22px}
+.rmeta{font-size:13px;color:var(--dim)}
+#rNew{color:var(--gold);font-weight:800;letter-spacing:.2em;min-height:1.5em}
+#pause .panel{padding:24px;display:flex;flex-direction:column;gap:10px;min-width:240px;text-align:center}
+@media (max-width:700px){#select .panel{grid-template-columns:1fr}#jacket{width:120px;justify-self:center}.diffs{grid-template-columns:repeat(2,1fr)}.rgrid{grid-template-columns:repeat(2,1fr)}#score{font-size:22px}.gauge{width:140px}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="譜面のレーン"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="prog"></div>
+  <div class="tl"><canvas class="jk" id="jkSmall" width="88" height="88"></canvas><div><b>星屑シグナル</b><small id="hudDiff">NORMAL 6</small></div></div>
+  <div class="tr"><div id="score" class="num">0000000</div><div class="gauge"><i id="gauge"></i><u></u></div></div>
+  <div id="hint">Space = AIR ／ Esc = 一時停止</div>
+</div>
+
+<section id="select" class="screen">
+  <div class="panel">
+    <canvas id="jacket" width="520" height="520"></canvas>
+    <div class="song">
+      <div class="logo">STELLA SLIDER</div>
+      <h1>星屑シグナル</h1>
+      <div class="meta">BPM 165 ・ 2:02 ・ 作曲：星奏スライダー（この場で合成）</div>
+      <div class="diffs" id="diffs"></div>
+      <div class="opts">
+        <div class="opt">ノーツの速さ <button id="spdM" aria-label="遅く">−</button><b id="spd" class="num">6.0</b><button id="spdP" aria-label="速く">＋</button></div>
+        <div class="opt">タイミング <button id="offM" aria-label="早く">−</button><b id="off" class="num">+0</b><button id="offP" aria-label="遅く">＋</button><button class="tog" id="bCal">合わせる</button></div>
+        <div class="opt"><button class="tog" id="bAuto">オートプレイ：OFF</button></div>
+      </div>
+      <div id="calMsg"></div>
+      <div class="go"><button class="btn" id="bStart">START<small>Enter</small></button></div>
+      <div class="how">
+        <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd>・<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd> がレーンの 8 列。ノーツが判定ラインに重なる瞬間に、その列のキー（幅のあるノーツは、かかっている列ならどれでも）。
+        <span style="color:var(--pink)">ホールド</span>は押し続け、<span style="color:#7fb4ff">スライド</span>は帯に沿ってキーを押し替える。
+        <span style="color:var(--green)">AIR（↑）</span>は <kbd>Space</kbd>。タッチでは画面の下を指でたたき、指をすべらせ、AIR は上へはじく。
+        <br>←→ 難易度 ・ ↑↓ 速さ ・ Enter スタート
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="result" class="screen hidden">
+  <div class="panel">
+    <div class="rmeta" id="rDiff"></div>
+    <div id="rRank">S</div>
+    <div id="rScore" class="num">0</div>
+    <div id="rBadges"></div>
+    <div id="rNew"></div>
+    <div class="rgrid">
+      <div><small style="color:#ffe27a">BRILLIANT</small><b class="num" id="rB">0</b></div>
+      <div><small style="color:#ff9ad8">GREAT</small><b class="num" id="rG">0</b></div>
+      <div><small style="color:#7fe0ff">GOOD</small><b class="num" id="rO">0</b></div>
+      <div><small style="color:#9b98c8">MISS</small><b class="num" id="rM">0</b></div>
+    </div>
+    <div class="rmeta" id="rMeta"></div>
+    <div class="go" style="justify-content:center"><button class="btn" id="bRetry">もう一度<small>Enter</small></button><button class="btn sub" id="bBack">曲選択へ<small>Esc</small></button></div>
+  </div>
+</section>
+
+<section id="pause" class="screen hidden">
+  <div class="panel">
+    <b style="font-family:Orbitron,sans-serif;letter-spacing:.3em">PAUSE</b>
+    <button class="btn" id="bResume">つづける<small>Esc</small></button>
+    <button class="btn sub" id="bRetry2">やり直す<small>Enter</small></button>
+    <button class="btn sub" id="bQuit">曲選択へ</button>
+  </div>
+</section>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const QS = new URLSearchParams(location.search);
+
+/* =====================================================================
+   1. 曲「星屑シグナル」— BPM 165、イ長調。サビは王道進行（D E C#m F#m）
+   ===================================================================== */
+const BPM = 165, SPB = 60 / BPM, S16 = SPB / 4;
+const SECTIONS = [
+  { name: 'intro', s: 0, n: 4 }, { name: 'intro2', s: 4, n: 4 }, { name: 'verse', s: 8, n: 8 }, { name: 'verse2', s: 16, n: 8 },
+  { name: 'pre', s: 24, n: 8 }, { name: 'chorus', s: 32, n: 16 }, { name: 'break', s: 48, n: 8 }, { name: 'pre2', s: 56, n: 8 },
+  { name: 'chorus2', s: 64, n: 16, tr: 1 }, { name: 'outro', s: 80, n: 4, tr: 1 },
+];
+const TOTAL_BARS = 84, SONG_LEN = TOTAL_BARS * 4 * SPB;
+const secAt = bar => SECTIONS.find(x => bar >= x.s && bar < x.s + x.n) || SECTIONS[SECTIONS.length - 1];
+const CHORD = {   // 和音（真ん中の高さ）と、ベースの音
+  'D': [[62, 66, 69], 38], 'E': [[64, 68, 71], 40], 'C#m': [[61, 64, 68], 37], 'F#m': [[61, 66, 69], 42],
+  'A': [[61, 64, 69], 45], 'Bm': [[62, 66, 71], 35],
+};
+const PROG = { intro: ['D', 'E', 'C#m', 'F#m'], intro2: ['D', 'E', 'C#m', 'F#m'], chorus: ['D', 'E', 'C#m', 'F#m'], chorus2: ['D', 'E', 'C#m', 'F#m'],
+  verse: ['F#m', 'D', 'A', 'E'], verse2: ['F#m', 'D', 'A', 'E'], break: ['F#m', 'D', 'A', 'E'], pre: ['Bm', 'C#m', 'D', 'E'], pre2: ['Bm', 'C#m', 'D', 'E'], outro: ['A', 'A', 'A', 'A'] };
+function chordAt(bar){ const sc = secAt(bar), name = PROG[sc.name][(bar - sc.s) % 4], [n, b] = CHORD[name], tr = sc.tr || 0; return { name, notes: n.map(m => m + tr), bass: b + tr, tr }; }
+
+// 旋律：1小節 8 個（8分音符）。'-' は前の音をのばす、'.' は休み
+const PH = {
+  hookA: ['F#5 F#5 E5 F#5 - A5 - F#5', 'E5 - D5 E5 - B4 - C#5', 'C#5 - B4 C#5 - E5 - G#5', 'A5 - - - G#5 F#5 E5 C#5',
+          'F#5 F#5 E5 F#5 - A5 - C#6', 'B5 - A5 B5 - G#5 - E5', 'E5 F#5 G#5 - A5 B5 C#6 -', 'C#6 - B5 - A5 - - .'],
+  hookB: ['F#5 F#5 E5 F#5 - A5 - F#5', 'E5 - D5 E5 - B4 - C#5', 'C#5 - B4 C#5 - E5 - G#5', 'A5 - - - G#5 F#5 E5 C#5',
+          'F#5 F#5 E5 F#5 - A5 - C#6', 'B5 - A5 B5 - G#5 - E5', 'E5 F#5 G#5 - A5 B5 C#6 -', 'A5 - - - - - - .'],
+  verse: ['C#5 . C#5 E5 . F#5 . E5', 'D5 . A4 . D5 E5 F#5 .', 'E5 . C#5 . E5 . A5 G#5', 'G#5 - E5 - B4 - - .',
+          'C#5 . C#5 E5 . F#5 . A5', 'F#5 . E5 . D5 . C#5 D5', 'E5 - C#5 - A4 - B4 C#5', 'B4 - - - . . . .'],
+  pre:   ['D5 . D5 . F#5 . D5 .', 'E5 . E5 . G#5 . E5 .', 'F#5 . F#5 . A5 . F#5 A5', 'B5 - - - . . . .',
+          'D5 . D5 . F#5 . D5 .', 'E5 . E5 . G#5 . E5 .', 'F#5 . F#5 . A5 . B5 C#6', 'B5 - - - . . . .'],
+  brk:   ['F#5 - - - E5 - - -', 'D5 - - - C#5 - - -', 'A4 - - - C#5 - E5 -', 'E5 - - - - - - -',
+          'F#5 - - - A5 - - -', 'G#5 - - - E5 - - -', 'C#5 - E5 - F#5 - G#5 -', 'A5 - - - - - - -'],
+  intro2: ['F#5 F#5 E5 F#5 - A5 - F#5', 'E5 - D5 E5 - B4 - C#5', 'C#5 - B4 C#5 - E5 - G#5', 'A5 - - - . . . .'],
+  outro: ['A5 - - - - - - -'],
+};
+const NOTE_RE = /^([A-G])(#?)(\d)$/, NB = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const midiOf = s => { const m = NOTE_RE.exec(s); return 12 * (+m[3] + 1) + NB[m[1]] + (m[2] ? 1 : 0); };
+function parsePhrase(lines, bar0, tr, out){
+  let last = null;
+  lines.forEach((line, i) => line.trim().split(/\s+/).forEach((tok, k) => {
+    const b = (bar0 + i) * 4 + k / 2;
+    if (tok === '-'){ if (last) last.len += .5; }
+    else if (tok === '.') last = null;
+    else { last = { b, m0: midiOf(tok), m: midiOf(tok) + tr, len: .5 }; out.push(last); }
+  }));
+}
+const MELODY = [];
+parsePhrase(PH.intro2, 4, 0, MELODY);
+parsePhrase(PH.verse, 8, 0, MELODY); parsePhrase(PH.verse, 16, 0, MELODY);
+parsePhrase(PH.pre, 24, 0, MELODY);
+parsePhrase(PH.hookA, 32, 0, MELODY); parsePhrase(PH.hookA, 40, 0, MELODY);
+parsePhrase(PH.brk, 48, 0, MELODY);
+parsePhrase(PH.pre, 56, 0, MELODY);
+parsePhrase(PH.hookA, 64, 1, MELODY); parsePhrase(PH.hookB, 72, 1, MELODY);
+parsePhrase(PH.outro, 80, 1, MELODY);
+MELODY.forEach(e => e.sec = secAt(Math.floor(e.b / 4)).name);
+
+// ドラム：16分の位置（0〜15）
+function drums(bar){
+  const sc = secAt(bar), k = bar - sc.s, last = k === sc.n - 1, D = { kick: [], snare: [], clap: [], ohat: [], chat: [], crash: false, roll: false };
+  switch (sc.name){
+    case 'intro': if (k >= 2) D.chat = [0, 4, 8, 12]; break;
+    case 'intro2': D.kick = [0, 8]; D.chat = [2, 6, 10, 14]; if (k === 3){ D.snare = [8, 10, 12, 13, 14, 15]; } break;
+    case 'verse': D.kick = [0, 7, 10]; D.snare = [4, 12]; D.chat = [0, 2, 4, 6, 8, 10, 12, 14]; D.crash = k === 0; break;
+    case 'verse2': D.kick = [0, 6, 10, 14]; D.snare = [4, 12]; D.clap = [12]; D.chat = [...Array(16).keys()]; D.crash = k === 0; break;
+    case 'pre': case 'pre2':
+      D.kick = k >= 4 ? [0, 4, 8, 12] : [0, 8]; D.snare = k < 6 ? [4, 12] : k === 6 ? [0, 2, 4, 6, 8, 10, 12, 14] : [...Array(16).keys()];
+      D.roll = k === 7; D.chat = k < 6 ? [2, 6, 10, 14] : []; D.crash = k === 0; break;
+    case 'chorus': case 'chorus2':
+      D.kick = [0, 4, 8, 12]; D.snare = [4, 12]; D.clap = [4, 12]; D.ohat = [2, 6, 10, 14]; D.chat = [1, 3, 5, 7, 9, 11, 13, 15]; D.crash = k % 8 === 0;
+      if (k % 8 === 7){ D.snare = [4, 12, 14, 15]; } break;
+    case 'break': D.kick = k >= 4 ? [0, 10] : [0]; D.snare = k >= 4 ? [8] : []; D.chat = k >= 2 ? [0, 4, 8, 12] : []; D.crash = k === 0; break;
+    case 'outro': if (k === 0){ D.kick = [0]; D.crash = true; D.snare = [0]; } break;
+  }
+  return D;
+}
+
+/* =====================================================================
+   2. 音（Web Audio で合成）
+   ===================================================================== */
+let ac = null, comp, musicBus, padBus, revIn, sfxBus, noiseBuf;
+function initAudio(){
+  if (ac){ if (ac.state === 'suspended' && !paused) ac.resume(); return; }
+  ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+  comp = ac.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 8; comp.ratio.value = 5; comp.attack.value = .003; comp.release.value = .2;
+  const master = ac.createGain(); master.gain.value = .9; comp.connect(master); master.connect(ac.destination);
+  musicBus = ac.createGain(); musicBus.gain.value = .8; musicBus.connect(comp);
+  padBus = ac.createGain(); padBus.connect(musicBus);
+  const len = ac.sampleRate * 2.6, ir = ac.createBuffer(2, len, ac.sampleRate);
+  for (let c = 0; c < 2; c++){ const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+  const conv = ac.createConvolver(); conv.buffer = ir; revIn = ac.createGain(); revIn.gain.value = .5; revIn.connect(conv); conv.connect(musicBus);
+  sfxBus = ac.createGain(); sfxBus.gain.value = .75; sfxBus.connect(comp);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function env(g, t, a, peak, hold, rel){ g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.setValueAtTime(peak, t + a + hold); g.gain.exponentialRampToValueAtTime(.0001, t + a + hold + rel); return t + a + hold + rel; }
+function wet(node, amt){ if (amt > 0){ const g = ac.createGain(); g.gain.value = amt; node.connect(g); g.connect(revIn); } }
+function synth(t, f, dur, o){
+  const { type = 'sawtooth', n = 1, det = 0, vol = .1, cut = 3000, q = .8, fenv = 0, a = .005, rel = .12, bus = musicBus, rev = 0 } = o;
+  const g = ac.createGain(), fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.Q.value = q;
+  fl.frequency.setValueAtTime(cut + fenv, t); if (fenv) fl.frequency.exponentialRampToValueAtTime(Math.max(60, cut), t + Math.min(.35, dur + .05));
+  const end = env(g, t, a, vol / Math.sqrt(n), Math.max(0, dur - a), rel);
+  for (let i = 0; i < n; i++){ const os = ac.createOscillator(); os.type = type; os.frequency.value = f; os.detune.value = n > 1 ? (i / (n - 1) - .5) * 2 * det : 0; os.connect(fl); os.start(t); os.stop(end + .02); }
+  fl.connect(g); g.connect(bus); wet(g, rev);
+}
+function bell(t, f, vol = .08, dec = 1.2, bus = musicBus, rev = .4){
+  const c = ac.createOscillator(), m = ac.createOscillator(), mg = ac.createGain(), g = ac.createGain();
+  c.frequency.value = f; m.frequency.value = f * 3.5; mg.gain.setValueAtTime(f * 1.4, t); mg.gain.exponentialRampToValueAtTime(1, t + dec * .7);
+  m.connect(mg); mg.connect(c.frequency); c.connect(g); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .003); g.gain.exponentialRampToValueAtTime(.0001, t + dec);
+  g.connect(bus); wet(g, rev); c.start(t); m.start(t); c.stop(t + dec + .05); m.stop(t + dec + .05);
+}
+function noise(t, dur, type, f, q, vol, bus = musicBus, rev = 0){
+  const s = ac.createBufferSource(); s.buffer = noiseBuf; const fl = ac.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(fl); fl.connect(g); g.connect(bus); wet(g, rev); s.start(t, Math.random()); s.stop(t + dur + .02);
+}
+function kick(t, v = 1){
+  const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(45, t + .11);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + .38); o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + .4);
+  noise(t, .02, 'highpass', 3000, .7, v * .25);
+  // サイドチェイン：キックに合わせて和音を沈める（うねり）
+  padBus.gain.cancelScheduledValues(t); padBus.gain.setValueAtTime(.3, t); padBus.gain.linearRampToValueAtTime(1, t + SPB * .8);
+}
+function snare(t, v = .5){ noise(t, .18, 'bandpass', 1800, .8, v, musicBus, .2); synth(t, 190, .05, { type: 'triangle', vol: v * .6, cut: 3000, rel: .06 }); }
+const clap = (t, v = .35) => [0, .012, .024].forEach(d => noise(t + d, .12, 'bandpass', 1400, 1, v, musicBus, .25));
+const hat = (t, v = .05, open) => noise(t, open ? .16 : .035, 'highpass', 8500, .6, v);
+const crash = (t, v = .2) => noise(t, 1.8, 'highpass', 5000, .5, v, musicBus, .3);
+function riser(t, dur, v = .12){ const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(8000, t + dur); const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur); s.connect(f); f.connect(g); g.connect(musicBus); s.start(t); s.stop(t + dur); }
+
+const LEAD = { intro2: 'bell', verse: 'pluck', verse2: 'pluck', pre: 'saw', pre2: 'saw', chorus: 'super', chorus2: 'super', break: 'bell', outro: 'super' };
+function playLead(e, t){
+  const f = mtof(e.m), dur = e.len * SPB * .92, kind = LEAD[e.sec];
+  if (kind === 'bell') bell(t, f * 2, .07, Math.max(.6, dur * 1.6));
+  else if (kind === 'pluck'){ synth(t, f, Math.min(dur, .25), { type: 'square', n: 2, det: 8, vol: .08, cut: 900, fenv: 3500, q: 2, rel: .15, rev: .25 }); }
+  else if (kind === 'saw') synth(t, f, dur, { n: 3, det: 12, vol: .07, cut: 2400, q: 1, a: .01, rel: .12, rev: .3 });
+  else { synth(t, f, dur, { n: 5, det: 22, vol: .11, cut: 5200, q: .7, a: .006, rel: .15, rev: .35 }); synth(t, f * 2, dur, { type: 'square', n: 2, det: 6, vol: .03, cut: 4000, rel: .1 }); }
+}
+function playStep(step, t){
+  const bar = step >> 4, s = step & 15; if (bar >= TOTAL_BARS) return;
+  const sc = secAt(bar), k = bar - sc.s, ch = chordAt(bar), D = drums(bar), BAR = S16 * 16;
+  const big = sc.name === 'chorus' || sc.name === 'chorus2';
+  // ドラム
+  if (D.kick.includes(s)) kick(t, big ? 1 : .9);
+  if (D.snare.includes(s)) snare(t, D.roll ? .12 + s * .025 : big ? .45 : .4);
+  if (D.clap.includes(s)) clap(t);
+  if (D.ohat.includes(s)) hat(t, .07, true);
+  if (D.chat.includes(s)) hat(t, s % 4 === 0 ? .05 : .03);
+  if (D.crash && s === 0) crash(t);
+  if (D.roll && s === 0) riser(t, BAR, .14);
+  if (sc.name === 'outro' && s === 0 && k === 0){ ch.notes.concat(ch.notes.map(m => m + 12)).forEach(m => synth(t, mtof(m), BAR * 2, { n: 5, det: 20, vol: .06, cut: 3000, a: .01, rel: 1.8, bus: padBus, rev: .6 })); synth(t, mtof(ch.bass), BAR * 1.5, { type: 'sine', vol: .35, cut: 400, rel: 1 }); bell(t, mtof(ch.notes[2] + 24), .08, 3.5); return; }
+  if (sc.name === 'outro') return;
+  // 和音
+  if (s === 0){
+    const pv = sc.name === 'intro' ? .05 : big ? .045 : .04;
+    ch.notes.forEach(m => synth(t, mtof(m), BAR * .98, { type: 'triangle', n: 2, det: 10, vol: pv, cut: big ? 2600 : 1600, a: .15, rel: .4, bus: padBus, rev: .5 }));
+  }
+  if (big && [0, 3, 6, 10, 12].includes(s)) ch.notes.forEach(m => synth(t, mtof(m + 12), S16 * 1.6, { n: 4, det: 18, vol: .05, cut: 4200, fenv: 2000, rel: .08, bus: padBus, rev: .25 }));
+  if ((sc.name === 'verse' || sc.name === 'verse2' || sc.name === 'break') && (s === 0 || s === 6 || s === 10)) ch.notes.forEach(m => synth(t, mtof(m), S16 * 1.8, { type: 'square', n: 1, vol: .03, cut: 1200, fenv: 2400, rel: .2, bus: padBus, rev: .3 }));
+  // ベース
+  const bf = mtof(ch.bass);
+  if (big){ if (s % 4 === 2) synth(t, bf, S16 * 1.6, { n: 2, det: 8, vol: .2, cut: 700, fenv: 900, q: 2, rel: .05 }); if (s % 4 === 0) synth(t, bf / 2, S16 * .9, { type: 'sine', vol: .25, cut: 300, rel: .05 }); }
+  else if (sc.name === 'pre' || sc.name === 'pre2'){ if (s % 2 === 0) synth(t, bf, S16 * 1.6, { n: 2, det: 6, vol: .16, cut: 600, fenv: 700, q: 2, rel: .05 }); }
+  else if (sc.name === 'verse' || sc.name === 'verse2'){ if ([0, 3, 6, 8, 11, 14].includes(s)) synth(t, bf, S16 * 1.5, { n: 2, det: 6, vol: .17, cut: 500, fenv: 800, q: 2, rel: .06 }); }
+  else if (sc.name === 'intro2' || sc.name === 'break'){ if (s === 0) synth(t, bf, BAR * .9, { type: 'sine', vol: .22, cut: 300, rel: .2 }); }
+  // 16分の分散和音（フィルターを開いていく）
+  if (sc.name !== 'break' || k >= 4){
+    const tones = [ch.notes[0], ch.notes[1], ch.notes[2], ch.notes[0] + 12, ch.notes[2], ch.notes[1] + 12, ch.notes[0] + 12, ch.notes[2] + 12];
+    const cut = sc.name === 'intro' ? 500 + (k * 16 + s) * 22 : big ? 4000 : 2400;
+    synth(t, mtof(tones[s % 8] + 12), S16 * .7, { type: 'square', vol: big ? .022 : .026, cut, fenv: 1500, q: 3, rel: .04, rev: .2 });
+  }
+}
+
+/* =====================================================================
+   3. 譜面。曲の旋律・ドラムから、難易度ごとの決まりで作る
+   ノーツ：{ t: 拍, type: 'tap'|'ex'|'hold'|'slide'|'air', c: 列(0〜7), w: 幅, len: 拍, c2: スライドの終わりの列 }
+   ===================================================================== */
+const COLS = 8;
+const DIFFS = [
+  { name: 'EASY', lv: 3, cls: 'd0' }, { name: 'NORMAL', lv: 6, cls: 'd1' }, { name: 'HARD', lv: 9, cls: 'd2' }, { name: 'MASTER', lv: 12, cls: 'd3' },
+];
+const colOf = (m0, w) => clamp(Math.round((m0 - 68) / (85 - 68) * (COLS - w)), 0, COLS - w);   // 旋律が高いほど右
+function buildChart(d){
+  const N = [], add = o => { N.push(Object.assign({ w: 2, len: 0 }, o)); return N[N.length - 1]; };
+  const W = [3, 2, 2, 2][d];
+  const inSec = (e, ...names) => names.includes(e.sec);
+  // ── 旋律のノーツ
+  let lastKept = -9;
+  const mel = MELODY.filter(e => !inSec(e, 'outro'));
+  for (let i = 0; i < mel.length; i++){
+    const e = mel[i], bar = Math.floor(e.b / 4), sc = secAt(bar), inBar = e.b - bar * 4;
+    if (sc.name === 'break' && d >= 2) continue;                          // 間奏（HARD 以上）はスライドで別に作る
+    if ((sc.name === 'pre' || sc.name === 'pre2') && bar - sc.s === 7 && d >= 1) continue;   // 溜めの小節は連打に置き換える
+    if (d === 0 && (inBar % 1 !== 0 || e.b - lastKept < 1.5)) continue;
+    if (d === 1 && e.b - lastKept < .5 - 1e-6) continue;
+    if (d <= 1 && sc.name === 'intro2' && inBar % 1 !== 0) continue;
+    // HARD 以上：音の間隔が 1 拍以内で、同じ向きに 3 音以上進む旋律は、1 本のスライドにまとめる（旋律の形をなぞって指をすべらせる）
+    if (d >= 2){
+      let j = i, dir = 0;
+      while (j + 1 < mel.length && mel[j + 1].b - mel[j].b <= 1 + 1e-6 && Math.floor(mel[j + 1].b / 4) < Math.floor(e.b / 4) + 2){
+        const dd = Math.sign(mel[j + 1].m0 - mel[j].m0); if (!dd || (dir && dd !== dir)) break; dir = dd; j++;
+      }
+      const kInPhrase = (bar - sc.s) % 4;
+      if (j - i >= 2 && Math.abs(colOf(mel[j].m0, 2) - colOf(e.m0, 2)) >= 2 && kInPhrase >= 2){   // フレーズの後半の駆け上がり・駆け下りだけ
+        const w = 2, lenB = mel[j].b - e.b + Math.min(mel[j].len, 1);
+        add({ t: e.b, type: 'slide', c: colOf(e.m0, w), c2: colOf(mel[j].m0, w), w, len: lenB, path: mel.slice(i, j + 1).map(x => [x.b - e.b, colOf(x.m0, w)]) });
+        lastKept = mel[j].b; i = j; continue;
+      }
+    }
+    const w = d === 3 && e.len <= .5 && sc.name.startsWith('chorus') ? 1 + (i % 2) : W;
+    const holdMin = [2, 2, 1.5, 1.5][d];   // ホールドは 1 拍以上
+    if (e.len >= holdMin) add({ t: e.b, type: 'hold', c: colOf(e.m0, w), w, len: e.len - .5 });
+    else add({ t: e.b, type: 'tap', c: colOf(e.m0, w), w });
+    lastKept = e.b;
+  }
+  // ── ドラムのノーツ（旋律と反対側の手で）
+  const sideOf = t => { const near = N.filter(n => Math.abs(n.t - t) <= 1).sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t))[0]; return near ? (near.c + near.w / 2 >= COLS / 2 ? 'L' : 'R') : 'L'; };
+  for (let bar = 4; bar < 80; bar++){
+    const sc = secAt(bar), k = bar - sc.s, D = drums(bar), big = sc.name.startsWith('chorus');
+    // 溜めの連打（Bメロの最後の小節）：中央で左右交互
+    if ((sc.name === 'pre' || sc.name === 'pre2') && k === 7 && d >= 1){
+      const step = d === 3 ? .25 : .5, w = d === 3 ? 1 : 2;
+      for (let x = 0; x < 4 - 1e-6; x += step){ const alt = Math.round(x / step) % 2; add({ t: bar * 4 + x, type: 'tap', c: d === 3 ? 3 + alt : 2 + alt * 2, w }); }
+      continue;
+    }
+    // 裏打ちのスネア（HARD 以上）
+    if (d >= 2 && (big || sc.name === 'verse2' || ((sc.name === 'pre' || sc.name === 'pre2') && k < 6)))
+      for (const st of D.snare.filter(x => x === 4 || x === 12)){ const t = bar * 4 + st / 4; const side = sideOf(t); add({ t, type: 'tap', c: side === 'L' ? 0 : COLS - 2, w: 2, drum: 1 }); }
+    // 4 つ打ちのキック（MASTER のサビ）：反対側の手で、1 列ずつ交互
+    if (d === 3 && big) for (const st of [0, 8]){ const t = bar * 4 + st / 4; const side = sideOf(t); add({ t, type: 'tap', c: side === 'L' ? (st ? 1 : 0) : (st ? COLS - 2 : COLS - 1), w: 1, drum: 1 }); }
+    // サビの頭（シンバル）：真ん中の広い EX ＋ AIR
+    if (D.crash && big){ add({ t: bar * 4, type: 'ex', c: 2, w: 4 }); if (d >= 1) add({ t: bar * 4, type: 'air', c: 2, w: 4 }); }
+    // EASY / NORMAL の間奏：小節の頭にホールド（左右交互）
+    if (sc.name === 'break' && d <= 1 && k % 2 === 0 && d === 0) add({ t: bar * 4, type: 'hold', c: k % 4 ? 5 : 0, w: 3, len: 3 });
+  }
+  // ── 間奏（HARD 以上）：旋律の長い音を、次の音へ流れるスライドに
+  if (d >= 2){
+    const br = MELODY.filter(e => e.sec === 'break');
+    // 2 小節ごとに、旋律の音をなぞる 1 本の長いスライド（指で旋律を描く）
+    for (let b0 = 48; b0 < 56; b0 += 2){
+      const grp = br.filter(e => e.b >= b0 * 4 && e.b < (b0 + 2) * 4); if (!grp.length) continue;
+      const w = 2, t0 = grp[0].b, path = grp.map(e => [e.b - t0, colOf(e.m0, w)]), last = grp[grp.length - 1];
+      add({ t: t0, type: 'slide', c: path[0][1], c2: path[path.length - 1][1], w, len: last.b - t0 + Math.min(last.len, 2) - .5, path });
+    }
+    // 反対の手で、2 拍ごとの軽いタップ
+    for (let bar = 52; bar < 56; bar++) for (const x of [1, 3]) { const t = bar * 4 + x; add({ t, type: 'tap', c: sideOf(t) === 'L' ? 0 : COLS - 2, w: 2, drum: 1 }); }
+  }
+  // ── フレーズの終わりの長い音は、離した瞬間に AIR（HARD 以上）
+  if (d >= 2) N.filter(n => n.type === 'hold' && n.len >= 1.5 && (secAt(Math.floor(n.t / 4)).name.startsWith('chorus'))).forEach(n => add({ t: n.t + n.len, type: 'air', c: n.c, w: n.w }));
+  // ── 最後：全幅の EX ＋ AIR
+  add({ t: 320, type: 'ex', c: 0, w: 8 }); if (d >= 1) add({ t: 320, type: 'air', c: 0, w: 8 });
+  return tidy(N);
+}
+// 重なりの整理：ホールドやスライドを押している列にかかるタップは反対側へ、同じ時刻に同じ列のノーツは1つに
+function tidy(N){
+  const PRI = { ex: 0, hold: 1, slide: 1, tap: 2, air: 3 };   // 同じ時刻なら EX を優先して残す
+  N.sort((a, b) => a.t - b.t || PRI[a.type] - PRI[b.type] || (a.drum ? 1 : 0) - (b.drum ? 1 : 0));
+  const longs = N.filter(n => n.type === 'hold' || n.type === 'slide');
+  const out = [];
+  const colsAt = (n, t) => { if (n.type === 'slide'){ const c = Math.round(slideCol(n, t - n.t)); return [c, c + n.w - 1]; } return [n.c, n.c + n.w - 1]; };
+  for (const n of N){
+    if (n.type !== 'air'){
+      for (const L of longs){ if (L === n || !(L.t < n.t - 1e-6 && n.t < L.t + L.len + .25)) continue; const [a, b] = colsAt(L, n.t); if (n.c <= b && n.c + n.w - 1 >= a){ n.c = a >= COLS / 2 ? 0 : COLS - n.w; } }
+      if (out.some(o => o.type !== 'air' && Math.abs(o.t - n.t) < 1e-6 && o.c <= n.c + n.w - 1 && o.c + o.w - 1 >= n.c)){ if (!n.drum) continue; n.c = n.c < COLS / 2 ? COLS - n.w : 0; if (out.some(o => o.type !== 'air' && Math.abs(o.t - n.t) < 1e-6 && o.c <= n.c + n.w - 1 && o.c + o.w - 1 >= n.c)) continue; }
+    }
+    out.push(n);
+  }
+  // 同時に押すのは 2 か所まで
+  const res = [];
+  for (const n of out){ if (n.type !== 'air' && res.filter(o => o.type !== 'air' && Math.abs(o.t - n.t) < 1e-6).length >= 2) continue; res.push(n); }
+  return res;
+}
+const CHARTS = DIFFS.map((_, d) => buildChart(d));
+// 判定の単位：ノーツ＋ホールド・スライドの途中のチェック（半拍ごと）
+// スライドの列：旋律の音をなぞる折れ線（path）。なければ始まりから終わりへまっすぐ
+function slideCol(n, x){
+  if (!n.path) return lerp(n.c, n.c2, clamp(x / n.len, 0, 1));
+  const p = n.path; if (x <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (x <= p[i][0]){ const [x0, c0] = p[i - 1], [x1, c1] = p[i]; return lerp(c0, c1, (x - x0) / (x1 - x0)); }
+  return p[p.length - 1][1];
+}
+const tickBeats = n => { const a = []; for (let x = .5; x < n.len - 1e-6; x += .5) a.push(x); return a; };   // 途中のチェックは終わりより前だけ
+function units(chart){ let u = 0; for (const n of chart){ u++; if (n.type === 'hold' || n.type === 'slide') u += tickBeats(n).length; } return u; }
+
+/* =====================================================================
+   4. 設定と保存
+   ===================================================================== */
+const store = { get(k, d){ try { const v = localStorage.getItem('seiso.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v){ try { localStorage.setItem('seiso.' + k, JSON.stringify(v)); } catch (e) {} } };
+const CFG = { diff: store.get('diff', 1), speed: store.get('speed', 6), offset: store.get('offset', 0), auto: false };
+if (QS.has('auto')) CFG.auto = true;
+
+/* =====================================================================
+   5. 描画：奥から手前へ流れる台形のレーン
+   ===================================================================== */
+const cv = $('c'), g = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, L = {};
+function resize(){
+  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const hw = Math.min(W * .47, 560, H * .78);
+  L = { cx: W / 2, hw, yJ: H * .8, yF: H * .1, P: 3.2 };
+  L.s1 = 1 / (1 + L.P);
+}
+addEventListener('resize', resize); resize();
+function proj(X, Z){ const s = 1 / (1 + Math.max(-.2, Z) * L.P), k = (1 - s) / (1 - L.s1); return [L.cx + X * L.hw * s, L.yJ - (L.yJ - L.yF) * k, s]; }
+const Xc = c => -1 + 2 * c / COLS;
+function quad(X0, X1, Z0, Z1){ const a = proj(X0, Z0), b = proj(X1, Z0), c = proj(X1, Z1), d = proj(X0, Z1); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); }
+
+const FX = { bursts: [], texts: [], beams: new Float32Array(COLS), flash: 0, pulse: 0 };
+const STARS = Array.from({ length: 160 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), s: .2 + Math.random() * .8 }));
+function drawBG(t, beatK, section){
+  const pal = { intro: ['#0b0a2a', '#1b1050'], intro2: ['#0b0a2a', '#23115e'], verse: ['#081734', '#122c60'], verse2: ['#081734', '#163a74'], pre: ['#1a0c36', '#3a1466'], pre2: ['#1a0c36', '#3a1466'], chorus: ['#2a0a3a', '#6a1a78'], chorus2: ['#321038', '#8a2070'], break: ['#06162a', '#0e3150'], outro: ['#2a0a3a', '#6a1a78'] }[section] || ['#0b0a2a', '#1b1050'];
+  const gr = g.createRadialGradient(L.cx, L.yF + 40, 10, L.cx, L.yF + 40, Math.max(W, H));
+  gr.addColorStop(0, pal[1]); gr.addColorStop(.55, pal[0]); gr.addColorStop(1, '#040312');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // 星（中心から外へ流れる）
+  g.save(); g.translate(L.cx, L.yF + 30);
+  for (const s of STARS){ s.r += .0016 * (1 + beatK * 2) * s.s; if (s.r > 1) s.r -= 1; const R = s.r * s.r * Math.max(W, H) * .8; g.globalAlpha = s.r * .9; g.fillStyle = '#dfe6ff'; g.fillRect(Math.cos(s.a) * R, Math.sin(s.a) * R * .6, 1.5 + s.r * 2, 1.5 + s.r * 2); }
+  g.restore(); g.globalAlpha = 1;
+  // 拍で脈打つ輪
+  g.save(); g.translate(L.cx, L.yF + 30); g.strokeStyle = section.startsWith('chorus') ? 'rgba(255,120,220,.35)' : 'rgba(120,160,255,.25)'; g.lineWidth = 2;
+  for (let i = 0; i < 3; i++){ const r = 60 + i * 70 + beatK * 18; g.rotate(t * .1 * (i % 2 ? -1 : 1)); g.beginPath(); for (let k = 0; k <= 6; k++){ const a = k / 6 * Math.PI * 2; g.lineTo(Math.cos(a) * r, Math.sin(a) * r * .5); } g.stroke(); }
+  g.restore();
+}
+function drawLane(beatK, pressed){
+  // レーンの床
+  quad(-1, 1, -.05, 1.02); const gr = g.createLinearGradient(0, L.yF, 0, L.yJ); gr.addColorStop(0, 'rgba(14,10,44,.88)'); gr.addColorStop(1, 'rgba(26,20,70,.95)'); g.fillStyle = gr; g.fill();
+  // 列の境目
+  for (let c = 0; c <= COLS; c++){ const a = proj(Xc(c), -.05), b = proj(Xc(c), 1.02); g.strokeStyle = c === 0 || c === COLS ? 'rgba(120,230,255,.7)' : c === COLS / 2 ? 'rgba(200,190,255,.28)' : 'rgba(160,150,255,.14)'; g.lineWidth = c === 0 || c === COLS ? 2 : 1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  // 押している列の光
+  for (let c = 0; c < COLS; c++){
+    const on = pressed[c] ? 1 : 0; FX.beams[c] = Math.max(on, FX.beams[c] - .08); if (FX.beams[c] <= .01) continue;
+    quad(Xc(c), Xc(c + 1), 0, .38); const a = proj(0, 0), b = proj(0, .38); const bg = g.createLinearGradient(0, a[1], 0, b[1]); bg.addColorStop(0, `rgba(120,240,255,${.45 * FX.beams[c]})`); bg.addColorStop(1, 'rgba(120,240,255,0)'); g.fillStyle = bg; g.fill();
+  }
+  // 判定ライン
+  const a = proj(-1.02, 0), b = proj(1.02, 0);
+  g.strokeStyle = `rgba(255,${200 + 55 * beatK},${240},${.75 + .25 * beatK})`; g.lineWidth = 3 + 3 * beatK; g.shadowColor = '#ff7ae0'; g.shadowBlur = 16 + 20 * beatK;
+  g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.shadowBlur = 0;
+  // キーの文字
+  const KL = ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'];
+  g.font = '600 12px Orbitron, sans-serif'; g.textAlign = 'center';
+  for (let c = 0; c < COLS; c++){ const p = proj(Xc(c + .5), -.035); g.fillStyle = pressed[c] ? '#fff' : 'rgba(200,200,255,.45)'; g.fillText(KL[c], p[0], p[1] + 14); }
+}
+const NCOL = { tap: ['#4ff3ff', '#d8fdff'], ex: ['#ffd166', '#fff6d6'], hold: ['#ff5fd2', '#ffe0f6'], slide: ['#7fb4ff', '#e6f0ff'], drum: ['#b18cff', '#efe6ff'] };
+function drawNote(n, Z, Zb){
+  const inset = .012, X0 = Xc(n.c) + inset, X1 = Xc(n.c + n.w) - inset, th = .026;
+  if (n.type === 'hold'){
+    const Z1 = Math.min(1.05, Zb);
+    if (Z1 > Math.max(Z, -.05)){ quad(X0 + .02, X1 - .02, Math.max(Z, n.holding ? 0 : -.05), Z1); g.fillStyle = n.holding ? 'rgba(255,120,220,.55)' : n.broken ? 'rgba(120,110,150,.35)' : 'rgba(255,95,210,.32)'; g.fill(); }
+    if (Zb < 1.05){ quad(X0, X1, Zb - th * .6, Zb + th * .6); g.fillStyle = '#ff9ae6'; g.fill(); }
+  }
+  if (n.type === 'slide'){
+    const Z1 = Math.min(1.05, Zb), steps = 18; g.beginPath();
+    const pts = [];
+    const zs = []; for (let i = 0; i <= 40; i++) zs.push(lerp(Z, Zb, i / 40)); if (n.path) n.path.forEach(([x]) => zs.push(Z + (Zb - Z) * x / n.len)); zs.sort((a, b) => a - b);
+    for (const z of zs){ if (z < 0 && n.holding || z < -.05 || z > 1.05) continue; const c = slideCol(n, (z - Z) / (Zb - Z) * n.len); pts.push([Xc(c) + inset + .02, Xc(c + n.w) - inset - .02, z]); }
+    if (n.holding && Z < 0){ const c = slideCol(n, clamp(-Z / (Zb - Z), 0, 1) * n.len); pts.unshift([Xc(c) + inset + .02, Xc(c + n.w) - inset - .02, 0]); }
+    if (pts.length > 1){ pts.forEach((p, i) => { const q = proj(p[0], p[2]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); for (let i = pts.length - 1; i >= 0; i--){ const q = proj(pts[i][1], pts[i][2]); g.lineTo(q[0], q[1]); } g.closePath(); g.fillStyle = n.holding ? 'rgba(130,180,255,.6)' : n.broken ? 'rgba(120,120,160,.3)' : 'rgba(110,160,255,.38)'; g.fill();
+      g.strokeStyle = 'rgba(200,225,255,.8)'; g.lineWidth = 1.5; g.beginPath(); pts.forEach((p, i) => { const q = proj((p[0] + p[1]) / 2, p[2]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
+  }
+  if (n.headDone) return;
+  if (Z < -.06 || Z > 1.05) return;
+  const col = NCOL[n.drum ? 'drum' : n.type === 'hold' ? 'hold' : n.type === 'slide' ? 'slide' : n.type];
+  quad(X0, X1, Z - th, Z + th); g.fillStyle = col[0]; g.fill();
+  quad(X0 + .02, X1 - .02, Z - th * .35, Z + th * .35); g.fillStyle = col[1]; g.fill();
+  if (n.type === 'ex'){ g.save(); g.shadowColor = '#ffd166'; g.shadowBlur = 18; quad(X0, X1, Z - th, Z + th); g.strokeStyle = '#fff3c4'; g.lineWidth = 2; g.stroke(); g.restore(); }
+}
+function drawAir(n, Z){
+  if (n.done || Z < -.05 || Z > 1.05) return;
+  const cx = Xc(n.c + n.w / 2), p = proj(cx, Z), s = p[2], w = (n.w / COLS) * L.hw * s * .9, y = p[1] - 26 * s - 10;
+  g.save(); g.shadowColor = '#6dff9e'; g.shadowBlur = 12; g.fillStyle = 'rgba(109,255,158,.9)';
+  g.beginPath(); g.moveTo(p[0] - w, y + 14 * s); g.lineTo(p[0], y - 16 * s); g.lineTo(p[0] + w, y + 14 * s); g.lineTo(p[0] + w * .7, y + 20 * s); g.lineTo(p[0], y - 4 * s); g.lineTo(p[0] - w * .7, y + 20 * s); g.closePath(); g.fill(); g.restore();
+}
+function burst(c0, w, color, big){
+  const p = proj(Xc(c0 + w / 2), 0);
+  FX.bursts.push({ x: p[0], y: p[1], t: 0, color, big, w: w / COLS * L.hw, parts: Array.from({ length: big ? 18 : 10 }, () => ({ a: -Math.PI * Math.random(), v: 120 + Math.random() * 260 })) });
+}
+function judgeText(text, color, sub){ FX.texts.push({ text, color, sub, t: 0 }); }
+function drawFX(dt){
+  FX.bursts = FX.bursts.filter(b => (b.t += dt) < .45);
+  for (const b of FX.bursts){
+    const k = b.t / .45;
+    g.globalAlpha = 1 - k; g.strokeStyle = b.color; g.lineWidth = b.big ? 4 : 3;
+    g.beginPath(); g.ellipse(b.x, b.y, b.w * (.45 + k * .35), 6 + k * 14, 0, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = b.color; for (const p of b.parts){ const r = p.v * b.t; g.fillRect(b.x + Math.cos(p.a) * r * 1.4, b.y + Math.sin(p.a) * r, 3, 3); }
+  }
+  g.globalAlpha = 1;
+  FX.texts = FX.texts.filter(x => (x.t += dt) < .5).slice(-1);
+  for (const x of FX.texts){
+    const k = x.t / .5, y = L.yJ - 70 - k * 14; g.globalAlpha = 1 - k * k; g.textAlign = 'center';
+    g.font = `800 ${Math.round(26 * (1 + .25 * Math.max(0, .15 - x.t) / .15))}px Orbitron, sans-serif`; g.fillStyle = x.color; g.shadowColor = x.color; g.shadowBlur = 14; g.fillText(x.text, L.cx, y); g.shadowBlur = 0;
+    if (x.sub){ g.font = '700 12px Orbitron, sans-serif'; g.fillStyle = x.sub === 'FAST' ? '#7fd0ff' : '#ff9a7a'; g.fillText(x.sub, L.cx, y + 18); }
+  }
+  g.globalAlpha = 1;
+}
+
+/* =====================================================================
+   6. プレイ：時計・入力・判定・スコア
+   ===================================================================== */
+const JW = { B: .045, G: .085, O: .125 };   // BRILLIANT / GREAT / GOOD の幅（秒、前後それぞれ）
+const G = { state: 'select', chart: [], t0: 0, idx: 0, sched: 0, timer: 0, st: 0, score: 0, shown: 0, combo: 0, maxCombo: 0, cnt: { B: 0, G: 0, O: 0, M: 0 }, fast: 0, slow: 0, sum: 0, total: 1, gauge: 0, lastJudge: 0 };
+let paused = false;
+const lat = () => ac ? (ac.baseLatency || 0) + (ac.outputLatency || 0) : 0;
+function audioNow(perfMs = performance.now()){
+  if (!ac) return 0;
+  if (ac.getOutputTimestamp){ const ts = ac.getOutputTimestamp(), gap = ac.currentTime - ts.contextTime; if (ts.performanceTime > 0 && gap >= 0 && gap < .5) return ts.contextTime + (perfMs - ts.performanceTime) / 1000; }
+  return ac.currentTime - lat() - (performance.now() - perfMs) / 1000;
+}
+const songTime = perfMs => audioNow(perfMs) - G.t0 - CFG.offset / 1000;
+const beatsOf = s => s / SPB;
+
+// 押している列（キーとタッチ）
+const pressed = new Array(COLS).fill(0), keyCols = new Map(), touchCols = new Map();
+function recount(){ pressed.fill(0); for (const c of keyCols.values()) pressed[c]++; for (const p of touchCols.values()) pressed[p.c]++; }
+const KEYMAP = { KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3, KeyJ: 4, KeyK: 5, KeyL: 6, Semicolon: 7 };
+
+function start(){
+  initAudio(); ac.resume();
+  G.chart = CHARTS[CFG.diff].map(n => Object.assign({}, n, { T: n.t * SPB, Te: (n.t + n.len) * SPB }));
+  G.chart.forEach(n => { if (n.type === 'hold' || n.type === 'slide'){ n.ticks = tickBeats(n).map(x => ({ T: (n.t + x) * SPB, done: false })); n.lastOn = -9; } });
+  G.total = units(G.chart); G.sum = 0; G.score = 0; G.shown = 0; G.combo = 0; G.maxCombo = 0; G.cnt = { B: 0, G: 0, O: 0, M: 0 }; G.fast = 0; G.slow = 0; G.gauge = 0; G.idx = 0;
+  FX.bursts = []; FX.texts = [];
+  if (G.bus){ G.bus.disconnect(); }
+  G.t0 = ac.currentTime + 1.2; G.sched = 0; paused = false;
+  clearInterval(G.timer); G.timer = setInterval(pump, 25); pump();
+  keyCols.clear(); touchCols.clear(); recount();
+  G.state = 'play'; show('hud'); $('hint').style.opacity = 1; setTimeout(() => $('hint').style.opacity = 0, 8000);
+  $('hudDiff').textContent = `${DIFFS[CFG.diff].name} ${DIFFS[CFG.diff].lv}`; $('hudDiff').className = DIFFS[CFG.diff].cls;
+}
+function pump(){
+  if (G.state !== 'play' || paused) return;
+  const lim = ac.currentTime + .2;
+  while (G.sched < TOTAL_BARS * 16 && G.t0 + G.sched * S16 < lim){ const t = G.t0 + G.sched * S16; if (t > ac.currentTime - .05) playStep(G.sched, t); G.sched++; }
+  while (G.idx < MELODY.length && G.t0 + MELODY[G.idx].b * SPB < lim){ const e = MELODY[G.idx++], t = G.t0 + e.b * SPB; if (t > ac.currentTime - .05) playLead(e, t); }
+}
+function stopMusic(){ clearInterval(G.timer); G.timer = 0; if (ac){ musicBus.gain.cancelScheduledValues(ac.currentTime); musicBus.gain.setValueAtTime(musicBus.gain.value, ac.currentTime); musicBus.gain.linearRampToValueAtTime(0, ac.currentTime + .15); setTimeout(() => { if (G.state !== 'play') return; }, 0); } }
+
+// 手ごたえの音：早く押したときは、ノーツの拍ちょうどに鳴らす
+function hitSound(n, kind){
+  if (!ac) return; const t = Math.max(ac.currentTime, G.t0 + (n.T || 0));
+  if (kind === 'tick'){ noise(t, .025, 'highpass', 6000, .7, .05, sfxBus); return; }
+  if (kind === 'air'){ const o = ac.createOscillator(), gg = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(2600, t + .12); gg.gain.setValueAtTime(.08, t); gg.gain.exponentialRampToValueAtTime(.0001, t + .25); o.connect(gg); gg.connect(sfxBus); o.start(t); o.stop(t + .3); noise(t, .15, 'bandpass', 3000, 1, .08, sfxBus); return; }
+  noise(t, .03, 'bandpass', 5200, 1.2, .16, sfxBus);
+  synth(t, kind === 'ex' ? 2093 : 1568, .02, { type: 'triangle', vol: kind === 'ex' ? .1 : .07, cut: 8000, rel: kind === 'ex' ? .2 : .06, bus: sfxBus });
+  if (kind === 'ex') bell(t, 2637, .05, .6, sfxBus, .2);
+}
+function judgeOf(dt){ const a = Math.abs(dt); return a <= JW.B ? 'B' : a <= JW.G ? 'G' : a <= JW.O ? 'O' : null; }
+const JCOL = { B: '#ffe27a', G: '#ff9ad8', O: '#7fe0ff', M: '#9b98c8' }, JNAME = { B: 'BRILLIANT', G: 'GREAT', O: 'GOOD', M: 'MISS' };
+function award(j, n, dt, silentText){
+  G.cnt[j]++;
+  if (j === 'M'){ G.combo = 0; G.gauge = Math.max(0, G.gauge - 2.5); if (!silentText) judgeText('MISS', JCOL.M); return; }
+  G.sum += j === 'B' ? 1 : j === 'G' ? .75 : .4; G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo); G.gauge = Math.min(100, G.gauge + 100 / G.total * 1.6);
+  if (j !== 'B'){ if (dt < 0) G.fast++; else G.slow++; }
+  if (!silentText) judgeText(JNAME[j], JCOL[j], j === 'B' ? '' : dt < 0 ? 'FAST' : 'SLOW');
+}
+function tickAward(ok){ if (ok){ G.sum += 1; G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo); G.gauge = Math.min(100, G.gauge + 100 / G.total * 1.6); } else { G.cnt.M++; G.combo = 0; G.gauge = Math.max(0, G.gauge - 1.2); } }
+
+// タップ：押した列にかかる、いちばん近いノーツを判定
+function press(c, perfMs){
+  if (G.state !== 'play' || paused) return;
+  const st = songTime(perfMs); let best = null, bd = 9;
+  for (const n of G.chart){
+    if (n.T > st + JW.O) break;
+    if (n.headDone || n.type === 'air') continue;
+    const cc = n.type === 'slide' ? n.c : n.c;
+    if (c < cc - (n.w === 1 ? 0 : 0) || c > cc + n.w - 1) continue;
+    const d = st - n.T; if (Math.abs(d) <= JW.O && Math.abs(d) < bd){ best = n; bd = Math.abs(d); }
+  }
+  if (!best) return;
+  const d = st - best.T, j = judgeOf(d); best.headDone = true; best.hit = true;
+  if (best.type === 'hold' || best.type === 'slide') best.holding = true;
+  award(j, best, d); hitSound(best, best.type === 'ex' ? 'ex' : 'tap');
+  burst(best.type === 'slide' ? best.c : best.c, best.w, JCOL[j], best.type === 'ex');
+}
+function air(perfMs){
+  if (G.state !== 'play' || paused) return;
+  const st = songTime(perfMs); let best = null, bd = 9;
+  for (const n of G.chart){ if (n.T > st + JW.O) break; if (n.type !== 'air' || n.done) continue; const d = Math.abs(st - n.T); if (d <= JW.O && d < bd){ best = n; bd = d; } }
+  if (!best) return;
+  const d = st - best.T; best.done = true; award(judgeOf(d), best, d); hitSound(best, 'air'); burst(best.c, best.w, '#6dff9e', true); FX.flash = .5;
+}
+
+function update(){
+  const st = G.st = songTime();
+  // オートプレイ：ちょうどの時刻に押し、ホールド中は押し続ける
+  if (CFG.auto){
+    const auto = new Array(COLS).fill(0);
+    for (const n of G.chart){
+      if (n.T > st + .05) break;
+      if (!n.headDone && n.type !== 'air' && st >= n.T){ const c = n.c; keyCols.set('auto' + c, c); recount(); press(c, performance.now() - (st - n.T) * 1000); }
+      if (n.type === 'air' && !n.done && st >= n.T) air(performance.now() - (st - n.T) * 1000);
+      if ((n.type === 'hold' || n.type === 'slide') && st >= n.T - .02 && st <= n.Te + .1){ const x = clamp((st - n.T) / SPB, 0, n.len); const c = Math.round(n.type === 'slide' ? slideCol(n, x) : n.c); auto[c] = 1; }
+    }
+    for (const k of [...keyCols.keys()]) if (k.startsWith('auto')) keyCols.delete(k);
+    auto.forEach((v, c) => { if (v) keyCols.set('auto' + c, c); }); recount();
+  }
+  for (const n of G.chart){
+    if (n.T > st + .1) break;
+    // 見逃し
+    if (!n.headDone && n.type !== 'air' && st > n.T + JW.O){ n.headDone = true; award('M', n, 0); if (n.type === 'hold' || n.type === 'slide') n.broken = true; }
+    if (n.type === 'air' && !n.done && st > n.T + JW.O){ n.done = true; award('M', n, 0); }
+    // ホールド・スライドの途中のチェック
+    if (n.ticks){
+      const u = clamp((st - n.T) / Math.max(1e-3, n.Te - n.T), 0, 1);
+      const c0 = n.type === 'slide' ? slideCol(n, u * n.len) : n.c;
+      let on = false; for (let c = Math.floor(c0) - 1; c <= Math.ceil(c0 + n.w - 1) + 1; c++) if (c >= 0 && c < COLS && pressed[c] && (n.type === 'slide' || (c >= n.c && c <= n.c + n.w - 1))) on = true;
+      if (on) n.lastOn = st;
+      n.holding = on && st >= n.T - .05 && st <= n.Te;
+      const okNow = st - n.lastOn < .12;   // 直前 0.12 秒以内に押していれば成功
+      for (const k of n.ticks){ if (!k.done && st >= k.T){ k.done = true; tickAward(okNow); if (okNow){ hitSound(k, 'tick'); if (Math.random() < .5) burst(Math.round(c0), n.w, n.type === 'slide' ? '#9cc6ff' : '#ff9ae6', false); } else n.broken = true; } }
+    }
+  }
+  G.score = Math.round(1e6 * G.sum / G.total);
+  if (st > SONG_LEN + .8) finish();
+}
+
+/* ---------- 入力 ---------- */
+addEventListener('keydown', e => {
+  if (e.code in KEYMAP || e.code === 'Space' || e.key.startsWith('Arrow')) e.preventDefault();
+  if (e.repeat) return;
+  if (CAL.on && (e.code === 'Space' || e.code in KEYMAP)){ CAL.tap(e.timeStamp); return; }
+  if (G.state === 'play'){
+    if (e.code === 'Escape'){ togglePause(); return; }
+    if (paused){ if (e.code === 'Enter') { paused = false; show('hud'); start(); } return; }
+    if (e.code in KEYMAP){ const c = KEYMAP[e.code]; keyCols.set(e.code, c); recount(); press(c, e.timeStamp); }
+    else if (e.code === 'Space' || e.code === 'ArrowUp') air(e.timeStamp);
+  } else if (G.state === 'select'){
+    if (e.code === 'ArrowLeft') setDiff(CFG.diff - 1); else if (e.code === 'ArrowRight') setDiff(CFG.diff + 1);
+    else if (e.code === 'ArrowUp') setSpeed(CFG.speed + .5); else if (e.code === 'ArrowDown') setSpeed(CFG.speed - .5);
+    else if (e.code === 'Enter' || e.code === 'Space') start();
+  } else if (G.state === 'result'){
+    if (e.code === 'Enter' || e.code === 'Space') start(); else if (e.code === 'Escape') toSelect();
+  }
+});
+addEventListener('keyup', e => { if (e.code in KEYMAP){ keyCols.delete(e.code); recount(); } });
+// タッチ：判定ラインの高さで見た列。指をすべらせると列が変わる。上へはじくと AIR
+function colAtX(x){ const a = proj(-1, 0)[0], b = proj(1, 0)[0]; return clamp(Math.floor((x - a) / (b - a) * COLS), 0, COLS - 1); }
+cv.addEventListener('pointerdown', e => {
+  if (G.state !== 'play' || paused) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+  const c = colAtX(e.clientX); touchCols.set(e.pointerId, { c, y: e.clientY, t: e.timeStamp, air: false }); recount(); press(c, e.timeStamp);
+});
+cv.addEventListener('pointermove', e => {
+  const p = touchCols.get(e.pointerId); if (!p) return;
+  const c = colAtX(e.clientX); if (c !== p.c){ p.c = c; recount(); press(c, e.timeStamp); }
+  if (!p.air && p.y - e.clientY > 50 && e.timeStamp - p.t < 260){ p.air = true; air(e.timeStamp); }
+});
+const endTouch = e => { if (touchCols.delete(e.pointerId)) recount(); };
+cv.addEventListener('pointerup', endTouch); cv.addEventListener('pointercancel', endTouch);
+
+/* ---------- 一時停止・終了 ---------- */
+function togglePause(){
+  if (G.state !== 'play') return;
+  paused = !paused;
+  if (paused){ ac.suspend(); show('pause'); keyCols.clear(); touchCols.clear(); recount(); }
+  else { ac.resume(); show('hud'); }
+}
+function finish(){
+  G.state = 'result'; clearInterval(G.timer);
+  const score = G.score, allB = G.cnt.G + G.cnt.O + G.cnt.M === 0, fc = G.cnt.M === 0;
+  const rank = score >= 999000 ? 'SSS' : score >= 990000 ? 'SS' : score >= 975000 ? 'S' : score >= 950000 ? 'AAA' : score >= 925000 ? 'AA' : score >= 900000 ? 'A' : score >= 800000 ? 'B' : 'C';
+  const clear = G.gauge >= 70;
+  $('rDiff').textContent = `星屑シグナル ・ ${DIFFS[CFG.diff].name} ${DIFFS[CFG.diff].lv}${CFG.auto ? ' ・ オートプレイ' : ''}`;
+  $('rRank').textContent = rank;
+  $('rB').textContent = G.cnt.B; $('rG').textContent = G.cnt.G; $('rO').textContent = G.cnt.O; $('rM').textContent = G.cnt.M;
+  $('rBadges').innerHTML = (clear ? '<span class="badge" style="color:#8be9ff">CLEAR</span>' : '<span class="badge" style="color:#9b98c8">FAILED</span>') + (allB ? '<span class="badge" style="color:#ffd166">ALL BRILLIANT</span>' : fc ? '<span class="badge" style="color:#ff7ae0">FULL COMBO</span>' : '');
+  $('rMeta').textContent = `MAX COMBO ${G.maxCombo} ／ FAST ${G.fast} ・ SLOW ${G.slow} ／ ゲージ ${Math.round(G.gauge)}%`;
+  let best = store.get('best' + CFG.diff, null), isNew = false;
+  if (!CFG.auto && (!best || score > best.score)){ best = { score, rank, fc, allB }; store.set('best' + CFG.diff, best); isNew = true; }
+  if (!CFG.auto && best && (fc && !best.fc || allB && !best.allB)){ best.fc = best.fc || fc; best.allB = best.allB || allB; store.set('best' + CFG.diff, best); }
+  $('rNew').textContent = isNew ? 'NEW RECORD' : best ? `ベスト ${best.score.toLocaleString()}` : '';
+  // スコアを数え上げる
+  const t0 = performance.now(); $('rScore').textContent = '0';
+  const tick = () => { const k = Math.min(1, (performance.now() - t0) / 1100); $('rScore').textContent = Math.round(score * (1 - Math.pow(1 - k, 3))).toLocaleString(); if (k < 1) requestAnimationFrame(tick); };
+  setTimeout(() => { show('result'); tick(); renderDiffs(); }, 600);
+}
+function toSelect(){ G.state = 'select'; clearInterval(G.timer); if (ac && ac.state === 'suspended') ac.resume(); paused = false; show('select'); renderDiffs(); }
+
+/* ---------- 画面 ---------- */
+function show(id){ for (const s of ['select', 'result', 'pause']) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(id === 'hud' || id === 'pause')); }
+function renderDiffs(){
+  $('diffs').innerHTML = DIFFS.map((D, i) => { const b = store.get('best' + i, null); return `<button class="diff ${D.cls}${i === CFG.diff ? ' on' : ''}" data-i="${i}"><div class="n">${D.name}</div><div class="lv">${D.lv}</div><div class="bs">${b ? `${b.score.toLocaleString()}<br>${b.rank}${b.allB ? ' ・ AB' : b.fc ? ' ・ FC' : ''}` : `${CHARTS[i].filter(n => n.type !== 'air').length} ノーツ`}</div></button>`; }).join('');
+  $('diffs').querySelectorAll('.diff').forEach(b => b.onclick = () => { if (+b.dataset.i === CFG.diff) start(); else setDiff(+b.dataset.i); });
+}
+function setDiff(i){ CFG.diff = clamp(i, 0, 3); store.set('diff', CFG.diff); renderDiffs(); if (ac) bell(ac.currentTime, mtof(76 + CFG.diff * 4), .05, .4, sfxBus); }
+function setSpeed(v){ CFG.speed = Math.round(clamp(v, 1, 12) * 2) / 2; store.set('speed', CFG.speed); $('spd').textContent = CFG.speed.toFixed(1); }
+function setOffset(v){ CFG.offset = Math.round(clamp(v, -200, 200)); store.set('offset', CFG.offset); $('off').textContent = (CFG.offset >= 0 ? '+' : '') + CFG.offset + 'ms'; }
+$('spdM').onclick = () => setSpeed(CFG.speed - .5); $('spdP').onclick = () => setSpeed(CFG.speed + .5);
+$('offM').onclick = () => setOffset(CFG.offset - 5); $('offP').onclick = () => setOffset(CFG.offset + 5);
+$('bAuto').onclick = () => { CFG.auto = !CFG.auto; $('bAuto').textContent = 'オートプレイ：' + (CFG.auto ? 'ON' : 'OFF'); };
+$('bStart').onclick = start; $('bRetry').onclick = start; $('bBack').onclick = toSelect;
+$('bResume').onclick = togglePause; $('bRetry2').onclick = () => { paused = false; ac.resume(); start(); }; $('bQuit').onclick = () => { paused = false; toSelect(); };
+setSpeed(CFG.speed); setOffset(CFG.offset); renderDiffs();
+if (CFG.auto) $('bAuto').textContent = 'オートプレイ：ON';
+
+// タイミングを合わせる：120BPM で 12 回鳴らし、後ろの 8 回に合わせて Space を押したずれの中央値
+const CAL = { on: false, t0: 0, taps: [], tap(perfMs){ const t = audioNow(perfMs), k = Math.round((t - CAL.t0) / .5); if (k >= 4 && k < 12) CAL.taps.push(t - (CAL.t0 + k * .5)); } };
+$('bCal').onclick = () => {
+  initAudio(); ac.resume(); CAL.on = true; CAL.taps = []; CAL.t0 = ac.currentTime + .6;
+  for (let k = 0; k < 12; k++){ const t = CAL.t0 + k * .5; kick(t, k < 4 ? .5 : .8); hat(t, .06); }
+  $('calMsg').textContent = '最初の 4 回は聞くだけ。そのあとの 8 回に合わせて Space（またはレーンのキー）を押してください。';
+  setTimeout(() => { CAL.on = false; const d = CAL.taps.filter(x => Math.abs(x) < .25).sort((a, b) => a - b);
+    if (d.length < 5){ $('calMsg').textContent = `押せたのが ${d.length} 回でした。もう一度どうぞ（5 回以上必要）。`; return; }
+    setOffset(d[d.length >> 1] * 1000); $('calMsg').textContent = `ずれ ${Math.round(d[d.length >> 1] * 1000)}ms → タイミングを ${$('off').textContent} にしました。`; }, (.6 + 6 + .4) * 1000);
+};
+
+/* ---------- ジャケット（その場で描く） ---------- */
+function drawJacket(cvs){
+  const x = cvs.getContext('2d'), s = cvs.width;
+  const gr = x.createLinearGradient(0, 0, s, s); gr.addColorStop(0, '#1b0f4a'); gr.addColorStop(.6, '#5a1570'); gr.addColorStop(1, '#ff5fd2'); x.fillStyle = gr; x.fillRect(0, 0, s, s);
+  x.save(); x.translate(s * .5, s * .55);
+  for (let i = 0; i < 9; i++){ x.strokeStyle = `rgba(255,255,255,${.5 - i * .05})`; x.lineWidth = s * .008; x.beginPath(); x.arc(0, 0, s * (.1 + i * .06), Math.PI * 1.1, Math.PI * 1.9); x.stroke(); }
+  x.restore();
+  for (let i = 0; i < 120; i++){ const r = Math.random(); x.fillStyle = `rgba(255,255,255,${r})`; x.fillRect(Math.random() * s, Math.random() * s * .8, 1 + r * 3, 1 + r * 3); }
+  x.save(); x.translate(s * .5, s * .55); x.fillStyle = '#fff'; x.shadowColor = '#ffd166'; x.shadowBlur = s * .06;
+  x.beginPath(); for (let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? s * .05 : s * .13; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); x.restore();
+  x.fillStyle = 'rgba(255,255,255,.92)'; x.font = `800 ${s * .085}px "M PLUS 1p", sans-serif`; x.textAlign = 'center'; x.fillText('星屑シグナル', s / 2, s * .9);
+}
+drawJacket($('jacket')); drawJacket($('jkSmall'));
+
+/* =====================================================================
+   7. メインループ
+   ===================================================================== */
+let lastMs = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - lastMs) / 1000); lastMs = now;
+  const playing = G.state === 'play' && !paused;
+  if (playing) update();
+  const st = G.state === 'play' ? G.st : now / 1000 * .3;
+  const bt = beatsOf(Math.max(0, st)), ph = bt - Math.floor(bt), beatK = G.state === 'play' && st > 0 ? Math.exp(-ph * 6) : .2 + .1 * Math.sin(now / 300);
+  const bar = Math.floor(bt / 4), sec = G.state === 'play' ? secAt(clamp(bar, 0, TOTAL_BARS - 1)).name : 'intro';
+  drawBG(now / 1000, beatK, sec);
+  if (G.state === 'play' || G.state === 'result'){
+    drawLane(beatK, pressed);
+    const vis = 6 / (CFG.speed + 1.5);   // 奥から判定ラインまで何秒で来るか
+    // 大きなコンボ数
+    if (G.combo >= 5){ const p = proj(0, .5); g.textAlign = 'center'; g.font = `800 ${Math.round(64 * p[2] * 2)}px Orbitron, sans-serif`; g.fillStyle = 'rgba(255,255,255,.14)'; g.fillText(G.combo, p[0], p[1]); g.font = `700 ${Math.round(12 * p[2] * 2)}px Orbitron, sans-serif`; g.fillText('COMBO', p[0], p[1] + 22 * p[2] * 2); }
+    const vis0 = [];
+    for (let i = G.chart.length - 1; i >= 0; i--){
+      const n = G.chart[i], Z = (n.T - st) / vis; if (Z > 1.1) continue; const Zb = (n.Te - st) / vis;
+      if (n.type === 'air'){ vis0.push([n, Z]); continue; }
+      if (Zb < -.1 && n.headDone) continue;
+      drawNote(n, Z, Zb);
+    }
+    for (const [n, Z] of vis0) drawAir(n, Z);
+    drawFX(dt);
+    if (FX.flash > 0){ g.fillStyle = `rgba(160,255,200,${FX.flash * .25})`; g.fillRect(0, 0, W, H); FX.flash = Math.max(0, FX.flash - dt * 2); }
+    // HUD
+    G.shown += (G.score - G.shown) * Math.min(1, dt * 12);
+    $('score').textContent = String(Math.round(G.shown)).padStart(7, '0');
+    $('gauge').style.width = G.gauge + '%';
+    $('prog').style.width = clamp(st / SONG_LEN * 100, 0, 100) + '%';
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// 確認用：指定した曲の時刻（秒）で止める（画面はそのまま）
+function freezeAt(sec){ const id = setInterval(() => { if (G.state === 'play' && G.st >= sec){ clearInterval(id); paused = true; ac.suspend(); } }, 5); }
+window.__seiso = { freezeAt, SPB, CHARTS, MELODY, units, G, CFG, start, get state(){ return { st: G.state, score: G.score, combo: G.combo, max: G.maxCombo, cnt: G.cnt, total: G.total }; } };
+})();
+</script>
+</body>
+</html>
