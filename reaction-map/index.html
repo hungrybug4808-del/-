@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>反応の地図</title>
+<style>
+:root{--bg:#f6f3ec;--ink:#3b3a36;--sub:#8a877d;--panel:#fffdf8;--line:#e2ddd0;--accent:#5b8def;--ok:#4caf7d;--warn:#d9822b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic","Meiryo",system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 14px;cursor:pointer}
+button:hover{background:#fff;border-color:#cfc8b6}
+button:disabled{opacity:.4;cursor:default}
+#app{display:flex;flex-direction:column;height:100%;max-width:1200px;margin:0 auto}
+#top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.goal{display:flex;align-items:center;gap:12px}
+.goal .lbl{font-size:12px;color:var(--sub);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
+.goal b{font-size:18px}.goal small{display:block;color:var(--sub)}
+.tools{display:flex;align-items:center;gap:10px}
+.tools .mv b{font-size:20px}
+main{flex:1;display:flex;min-height:0;position:relative}
+#shelf{width:200px;padding:12px;border-right:1px solid var(--line);background:#faf7f0;overflow:auto}
+#shelf h3,#hand h3{margin:0 0 8px;font-size:13px;color:var(--sub);font-weight:600}
+#shelf.hot,#flaskWrap.hot #flask{outline:3px dashed var(--accent);outline-offset:-3px}
+.chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 8px;margin-bottom:8px;cursor:grab;touch-action:none}
+.chip:hover{border-color:#b9c9ee}
+.chip.dragging{opacity:.35}
+.chip.bottle{background:#eef4ff;border-color:#c9d8f6}
+.chip .nm{font-weight:600;font-size:14px}.chip .fm{font-size:12px;color:var(--sub)}
+.chip .inf{margin-left:4px;color:var(--accent);font-size:16px}
+#flaskWrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;min-width:0;position:relative}
+#flask{width:100%;max-width:640px;background:radial-gradient(ellipse at 50% 40%,#fff,#f0f6ff);border:2px solid #d5deee;border-radius:24px 24px 60px 60px;padding:8px}
+#flaskSvg{width:100%;height:auto;display:block;overflow:visible}
+#msg{min-height:28px;font-size:15px;color:var(--warn);margin-bottom:8px;text-align:center;transition:opacity .4s}
+#eq{min-height:34px;margin-top:10px;font-size:18px;text-align:center}
+#eq small{color:var(--sub);margin-right:8px}
+#hand{padding:10px 16px 14px;background:var(--panel);border-top:1px solid var(--line)}
+#handCards{display:flex;gap:12px;flex-wrap:wrap}
+.card{width:150px;padding:10px 12px;border-radius:14px;color:#fff;cursor:grab;touch-action:none;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+.card b{display:block;font-size:16px}.card span{font-size:11px;opacity:.9}
+.card.dragging{opacity:.4}
+.c-water{background:#5aa9e6}.c-oxidant{background:#e07a5f}.c-dehy{background:#b58a3c}.c-ester{background:#8e6bbf}
+.ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);transition:left .25s,top .25s,opacity .25s}
+.ghost.chip{background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);margin:0}
+.ghost.card{box-shadow:0 8px 18px rgba(0,0,0,.25)}
+#overlay{position:fixed;inset:0;background:rgba(60,58,50,.35);display:none;align-items:center;justify-content:center;z-index:100}
+#overlay .box{background:var(--panel);border-radius:20px;padding:26px 34px;text-align:center;min-width:300px}
+#overlay h2{margin:0 0 6px}
+#overlay .btns{display:flex;gap:10px;justify-content:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="goal"><span class="lbl">ゴール</span><div id="goalSvg"></div><div><b id="goalName"></b><small id="goalFormula"></small></div></div>
+    <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><span id="pickRow"></span></div>
+  </header>
+  <main>
+    <aside id="shelf"><h3>棚（手持ちの分子）</h3><div id="shelfItems"></div></aside>
+    <section id="flaskWrap"><div id="msg"></div><div id="flask"><svg id="flaskSvg" viewBox="0 0 600 340"></svg></div><div id="eq"></div></section>
+  </main>
+  <footer id="hand"><h3>手札（フラスコへドラッグ）</h3><div id="handCards"></div></footer>
+</div>
+<div id="overlay"><div class="box" id="overlayBox"></div></div>
+
+<script>
+'use strict';
+/* =========================================================
+   データ（分子・カード・反応・パズル）— ここを増やせばステージが増える
+   ========================================================= */
+// atoms: id:[元素,x,y]（単位格子）  bonds:[a,b,結合次数(省略=1)]
+const MOLS = {
+  ethylene:{name:'エチレン',formula:'CH₂=CH₂',group:'二重結合',
+    atoms:{C1:['C',0,0],C2:['C',1,0],H1a:['H',0,-1],H1b:['H',0,1],H2a:['H',1,-1],H2b:['H',1,1]},
+    bonds:[['C1','C2',2],['C1','H1a'],['C1','H1b'],['C2','H2a'],['C2','H2b']]},
+  ethanol:{name:'エタノール',formula:'C₂H₅OH',group:'ヒドロキシ基',
+    atoms:{C1:['C',0,0],C2:['C',1,0],O:['O',2,0],Ho:['H',3,0],H1a:['H',0,-1],H1b:['H',0,1],H1c:['H',-1,0],H2a:['H',1,-1],H2b:['H',1,1]},
+    bonds:[['C1','C2'],['C2','O'],['O','Ho'],['C1','H1a'],['C1','H1b'],['C1','H1c'],['C2','H2a'],['C2','H2b']]},
+  acetaldehyde:{name:'アセトアルデヒド',formula:'CH₃CHO',group:'アルデヒド基',
+    atoms:{C1:['C',0,0],C2:['C',1,0],O:['O',1,-1],H2:['H',1,1],H1a:['H',0,-1],H1b:['H',0,1],H1c:['H',-1,0]},
+    bonds:[['C1','C2'],['C2','O',2],['C2','H2'],['C1','H1a'],['C1','H1b'],['C1','H1c']]},
+  aceticacid:{name:'酢酸',formula:'CH₃COOH',group:'カルボキシ基',
+    atoms:{C1:['C',0,0],C2:['C',1,0],O:['O',1,-1],Oh:['O',1,1],Hh:['H',1,2],H1a:['H',0,-1],H1b:['H',0,1],H1c:['H',-1,0]},
+    bonds:[['C1','C2'],['C2','O',2],['C2','Oh'],['Oh','Hh'],['C1','H1a'],['C1','H1b'],['C1','H1c']]},
+  ethylacetate:{name:'酢酸エチル',formula:'CH₃COOC₂H₅',group:'エステル結合',
+    atoms:{C1:['C',0,0],C2:['C',1,0],Oc:['O',1,-1],Oe:['O',2,0],C3:['C',3,0],C4:['C',4,0],
+      H1a:['H',0,-1],H1b:['H',0,1],H1c:['H',-1,0],H3a:['H',3,-1],H3b:['H',3,1],H4a:['H',4,-1],H4b:['H',4,1],H4c:['H',5,0]},
+    bonds:[['C1','C2'],['C2','Oc',2],['C2','Oe'],['Oe','C3'],['C3','C4'],['C1','H1a'],['C1','H1b'],['C1','H1c'],
+      ['C3','H3a'],['C3','H3b'],['C4','H4a'],['C4','H4b'],['C4','H4c']]},
+};
+
+// arity: 1つ用 / 2つ用。msgs: 反応しない分子ごとの一言、msg: それ以外の一言
+const CARDS = {
+  water:  {name:'水',sub:'リン酸触媒',cls:'c-water',arity:1,msg:'二重結合がないので、水は付加しません'},
+  oxidant:{name:'酸化剤',sub:'硫酸酸性二クロム酸カリウム',cls:'c-oxidant',arity:1,msg:'これ以上は酸化されにくい物質です',
+    msgs:{ethylene:'このステージの酸化剤は、ヒドロキシ基とアルデヒド基に働きます'}},
+  dehy:   {name:'濃硫酸',sub:'約170℃',cls:'c-dehy',arity:1,msg:'脱水できるのはアルコールです'},
+  ester:  {name:'濃硫酸',sub:'触媒',cls:'c-ester',arity:2,msg:'エステル化には、アルコールとカルボン酸の両方が必要です'},
+};
+
+// in: 必要な分子（順序＝スロット0,1）  out: できる分子
+// map: 生成物の原子 → 反応物の原子（"スロット.原子id"）。載っていない生成物の原子は新しく入ってくる。
+//      載っていない反応物の原子は抜けていく（leave のラベルで飛んでいく）。
+const REACTIONS = [
+  {id:'addition',name:'付加',card:'water',in:['ethylene'],out:'ethanol',cond:'リン酸触媒',
+    eq:'CH₂=CH₂ + H₂O → C₂H₅OH',enter:'H₂O',
+    map:{C1:'0.C1',C2:'0.C2',H1a:'0.H1a',H1b:'0.H1b',H2a:'0.H2a',H2b:'0.H2b'}},
+  {id:'oxidation1',name:'酸化',card:'oxidant',in:['ethanol'],out:'acetaldehyde',cond:'硫酸酸性二クロム酸カリウム',
+    eq:'C₂H₅OH → CH₃CHO',leave:'2H',
+    map:{C1:'0.C1',C2:'0.C2',O:'0.O',H2:'0.H2b',H1a:'0.H1a',H1b:'0.H1b',H1c:'0.H1c'}},
+  {id:'oxidation2',name:'酸化',card:'oxidant',in:['acetaldehyde'],out:'aceticacid',cond:'硫酸酸性二クロム酸カリウム',
+    eq:'CH₃CHO → CH₃COOH',enter:'[O]',
+    map:{C1:'0.C1',C2:'0.C2',O:'0.O',Hh:'0.H2',H1a:'0.H1a',H1b:'0.H1b',H1c:'0.H1c'}},
+  {id:'dehydration',name:'脱水',card:'dehy',in:['ethanol'],out:'ethylene',cond:'濃硫酸・約170℃',
+    eq:'C₂H₅OH → CH₂=CH₂ + H₂O',leave:'H₂O',
+    map:{C1:'0.C1',C2:'0.C2',H1a:'0.H1a',H1b:'0.H1b',H2a:'0.H2a',H2b:'0.H2b'}},
+  {id:'esterification',name:'エステル化',card:'ester',in:['aceticacid','ethanol'],out:'ethylacetate',cond:'濃硫酸（触媒）',
+    eq:'CH₃COOH + C₂H₅OH → CH₃COOC₂H₅ + H₂O',leave:'H₂O',
+    map:{C1:'0.C1',H1a:'0.H1a',H1b:'0.H1b',H1c:'0.H1c',C2:'0.C2',Oc:'0.O',Oe:'1.O',C3:'1.C2',H3a:'1.H2a',H3b:'1.H2b',
+         C4:'1.C1',H4a:'1.H1a',H4b:'1.H1b',H4c:'1.H1c'}},
+];
+
+// start: 瓶（∞）に入っている分子  require: クリアに必要な反応（省略可）
+const PUZZLES = [
+  {start:'ethanol',  goal:'acetaldehyde',min:1,require:[],aim:'酸化の基本'},
+  {start:'ethylene', goal:'aceticacid',  min:3,require:[],aim:'付加 → 酸化 → 酸化'},
+  {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],aim:'脱水と付加は逆の関係（エチレンを経由）'},
+  {start:'ethylene', goal:'ethylacetate',min:5,require:[],aim:'2つに分けて、片方を酢酸にしてから合わせる'},
+];
+const HAND = ['water','oxidant','dehy','ester'];
+
+/* =========================================================
+   分子の描画（玉と線）
+   ========================================================= */
+const R = {C:.30,O:.30,H:.19}, FILL = {C:'#2f2f33',O:'#e0585b',H:'#ffffff'};
+
+function bondSVG(x1,y1,x2,y2,order,op){
+  const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*3.5,ny=dx/L*3.5;
+  const ln=(a,b)=>`<line x1="${x1+a}" y1="${y1+b}" x2="${x2+a}" y2="${y2+b}" stroke="#8a877d" stroke-width="3" stroke-linecap="round" opacity="${op}"/>`;
+  return order===2 ? ln(nx,ny)+ln(-nx,-ny) : ln(0,0);
+}
+function atomSVG(a,S){
+  const r=R[a.el]*S, op=a.op??1;
+  let s=`<g opacity="${op}">`;
+  if(a.glow) s+=`<circle cx="${a.x}" cy="${a.y}" r="${r+7}" fill="#ffe066" opacity=".75"/>`;
+  s+=`<circle cx="${a.x}" cy="${a.y}" r="${r}" fill="${FILL[a.el]}" stroke="${a.el==='H'?'#b9b5a8':'rgba(0,0,0,.25)'}" stroke-width="1.5"/>`;
+  if(r>=9) s+=`<text x="${a.x}" y="${a.y+r*.38}" text-anchor="middle" font-size="${r*1.05}" font-weight="700" fill="${a.el==='H'?'#8a877d':'#fff'}" font-family="sans-serif">${a.el}</text>`;
+  return s+'</g>';
+}
+function sceneSVG(atoms,bonds,S){
+  const P={}; atoms.forEach(a=>P[a.id]=a);
+  let s='';
+  for(const b of bonds){const A=P[b.a],B=P[b.b]; if(A&&B) s+=bondSVG(A.x,A.y,B.x,B.y,b.order,b.op??1);}
+  for(const a of atoms) s+=atomSVG(a,S);
+  return s;
+}
+function bbox(kind){
+  const xs=[],ys=[];
+  for(const id in MOLS[kind].atoms){const [,x,y]=MOLS[kind].atoms[id];xs.push(x);ys.push(y);}
+  return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};
+}
+// 分子を中心(cx,cy)に置いたときの原子・結合。prefix は原子idの接頭辞
+function molScene(kind,cx,cy,S,prefix){
+  const m=MOLS[kind],b=bbox(kind),mx=(b.x0+b.x1)/2,my=(b.y0+b.y1)/2;
+  const atoms=Object.entries(m.atoms).map(([id,[el,x,y]])=>({id:prefix+id,el,x:cx+(x-mx)*S,y:cy+(y-my)*S}));
+  const bonds=m.bonds.map(([a,c,o])=>({a:prefix+a,b:prefix+c,order:o||1}));
+  return {atoms,bonds};
+}
+function molSVG(kind,S){
+  const b=bbox(kind),pad=.5,w=(b.x1-b.x0+2*pad)*S,h=(b.y1-b.y0+2*pad)*S;
+  const sc=molScene(kind,w/2,h/2,S,'');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${sceneSVG(sc.atoms,sc.bonds,S)}</svg>`;
+}
+
+/* =========================================================
+   ゲーム状態
+   ========================================================= */
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+let pi=0, P=null, state=null, busy=false, uidn=1;
+const FLASK_S=40;
+
+const newInst=(kind,bottle)=>({uid:uidn++,kind,bottle:!!bottle});
+
+function startPuzzle(i){
+  pi=i; P=PUZZLES[i]; busy=false;
+  state={shelf:[],flask:[],moves:0,used:[],hist:[]};
+  snap(); $('#eq').innerHTML=''; $('#overlay').style.display='none';
+  renderAll();
+}
+function snap(){state.hist.push(JSON.stringify({shelf:state.shelf,moves:state.moves,used:state.used}));}
+function undo(){
+  if(busy||state.hist.length<2) return;
+  state.hist.pop();
+  Object.assign(state,JSON.parse(state.hist[state.hist.length-1]),{flask:[]});
+  $('#eq').innerHTML=''; renderAll();
+}
+
+/* ---------- 反応の判定 ---------- */
+function findReaction(cardId,kinds){
+  const k=[...kinds].sort().join();
+  return REACTIONS.find(r=>r.card===cardId&&[...r.in].sort().join()===k);
+}
+function failMessage(cardId,kinds){
+  const c=CARDS[cardId];
+  if(!kinds.length) return '先に分子をフラスコへ入れてください';
+  if(c.arity===1&&kinds.length>1) return 'このカードは分子1つに使います';
+  return (c.msgs&&c.msgs[kinds[0]])||c.msg;
+}
+
+async function useCard(cardId){
+  const items=state.flask, kinds=items.map(i=>i.kind);
+  const r=findReaction(cardId,kinds);
+  if(!r){ say(failMessage(cardId,kinds)); return false; }
+  busy=true;
+  // スロット順（r.in の順）に並べ替え
+  const pool=[...items], slots=r.in.map(k=>pool.splice(pool.findIndex(i=>i.kind===k),1)[0]);
+  await animateReaction(r,slots);
+  state.flask=[];
+  state.shelf.push({...newInst(r.out),produced:true});
+  state.moves++; if(!state.used.includes(r.id)) state.used.push(r.id);
+  snap();
+  $('#eq').innerHTML=`<small>${r.name}</small>${r.eq}`;
+  busy=false; renderAll();
+  if(isCleared()) onClear();
+  return true;
+}
+async function animateReaction(){ /* ステップ2で実装 */ }
+function isCleared(){
+  return state.shelf.some(i=>i.produced&&i.kind===P.goal)&&P.require.every(id=>state.used.includes(id));
+}
+function starsFor(moves){return moves<=P.min?3:moves<=P.min+2?2:1;}
+function onClear(){
+  const st=starsFor(state.moves);
+  $('#overlayBox').innerHTML=`<h2>クリア！</h2><div style="font-size:28px;color:#e6a700">${'★'.repeat(st)}${'☆'.repeat(3-st)}</div>
+    <p>手数 ${state.moves}（最少 ${P.min}）</p>
+    <div class="btns">${pi<PUZZLES.length-1?'<button id="nextBtn">次の問へ</button>':''}<button id="retryBtn">もう一度</button></div>`;
+  $('#overlay').style.display='flex';
+  const n=$('#nextBtn'); if(n) n.onclick=()=>startPuzzle(pi+1);
+  $('#retryBtn').onclick=()=>startPuzzle(pi);
+}
+
+/* ---------- 表示 ---------- */
+let msgTimer=null;
+function say(t){const m=$('#msg'); m.textContent=t; m.style.opacity=1; clearTimeout(msgTimer); msgTimer=setTimeout(()=>m.style.opacity=0,4000);}
+
+function renderAll(){
+  const g=MOLS[P.goal];
+  $('#goalSvg').innerHTML=molSVG(P.goal,16); $('#goalName').textContent=g.name; $('#goalFormula').textContent=g.formula;
+  $('#moves').textContent=state.moves;
+  $('#pickRow').innerHTML=PUZZLES.map((_,i)=>`<button data-p="${i}" style="padding:4px 10px;${i===pi?'background:#dbe6fb':''}">${i+1}</button>`).join(' ');
+  document.querySelectorAll('#pickRow button').forEach(b=>b.onclick=()=>startPuzzle(+b.dataset.p));
+  renderShelf(); renderFlask(); renderHand();
+}
+function chip(kind,bottle,inst){
+  const m=MOLS[kind], d=el('div','chip'+(bottle?' bottle':''),
+    `${molSVG(kind,12)}<div><div class="nm">${m.name}${bottle?'<span class="inf">∞</span>':''}</div><div class="fm">${m.formula}</div></div>`);
+  d.addEventListener('pointerdown',e=>beginDrag(e,{
+    html:molSVG(kind,14),cls:'chip',from:d,
+    onStart:()=>d.classList.add('dragging'),
+    onEnd:()=>d.classList.remove('dragging'),
+    onDrop:zone=>{
+      if(zone!=='flask') return false;
+      if(state.flask.length>=2){say('フラスコには2つまで入ります'); return false;}
+      if(bottle) state.flask.push(newInst(kind,true));
+      else state.flask.push(state.shelf.splice(state.shelf.findIndex(i=>i.uid===inst.uid),1)[0]);
+      renderAll(); return true;
+    }}));
+  return d;
+}
+function renderShelf(){
+  const box=$('#shelfItems'); box.innerHTML='';
+  box.appendChild(chip(P.start,true));
+  state.shelf.forEach(i=>box.appendChild(chip(i.kind,false,i)));
+}
+function slotX(n,i){return n===1?300:(i===0?165:435);}
+function renderFlask(){
+  const svg=$('#flaskSvg'), n=state.flask.length; let s='';
+  state.flask.forEach((inst,i)=>{
+    const sc=molScene(inst.kind,slotX(n,i),170,FLASK_S,'');
+    s+=`<g class="fm" data-uid="${inst.uid}" style="cursor:grab;touch-action:none"><rect x="${slotX(n,i)-120}" y="60" width="240" height="220" fill="transparent"/>${sceneSVG(sc.atoms,sc.bonds,FLASK_S)}</g>`;
+  });
+  if(!n) s='<text x="300" y="175" text-anchor="middle" fill="#b9b5a8" font-size="20" font-family="sans-serif">ここに分子とカードを入れよう</text>';
+  svg.innerHTML=s;
+}
+$('#flaskSvg').addEventListener('pointerdown',e=>{
+  const g=e.target.closest('[data-uid]'); if(!g) return;
+  const inst=state.flask.find(i=>i.uid==g.dataset.uid); if(!inst) return;
+  beginDrag(e,{html:molSVG(inst.kind,14),cls:'chip',from:g,
+    onStart:()=>g.style.opacity=.3, onEnd:()=>g.style.opacity=1,
+    onDrop:zone=>{
+      if(zone!=='shelf') return false;
+      state.flask=state.flask.filter(i=>i!==inst);
+      if(!inst.bottle) state.shelf.push(inst);
+      renderAll(); return true;
+    }});
+});
+function renderHand(){
+  const box=$('#handCards'); box.innerHTML='';
+  HAND.forEach(id=>{
+    const c=CARDS[id], d=el('div','card '+c.cls,`<b>${c.name}</b><span>${c.sub}</span>`);
+    d.addEventListener('pointerdown',e=>beginDrag(e,{
+      html:`<b>${c.name}</b><span>${c.sub}</span>`,cls:'card '+c.cls,from:d,
+      onStart:()=>d.classList.add('dragging'),onEnd:()=>d.classList.remove('dragging'),
+      onDrop:async zone=>{
+        if(zone!=='flask') return false;
+        return await useCard(id) ? true : false;
+      }}));
+    box.appendChild(d);
+  });
+}
+
+/* ---------- ドラッグ＆ドロップ ---------- */
+let drag=null;
+function zoneAt(x,y){
+  const inside=(id)=>{const r=$(id).getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;};
+  if(inside('#flask')) return 'flask';
+  if(inside('#shelf')) return 'shelf';
+  return null;
+}
+function beginDrag(e,info){
+  if(busy||drag||e.button>0) return;
+  e.preventDefault();
+  const g=el('div','ghost '+(info.cls||''),info.html); document.body.appendChild(g);
+  const r=info.from.getBoundingClientRect();
+  drag={g,info,home:{x:r.left+r.width/2,y:r.top+r.height/2}};
+  place(e); info.onStart&&info.onStart();
+  window.addEventListener('pointermove',onMove); window.addEventListener('pointerup',onUp); window.addEventListener('pointercancel',onUp);
+}
+function place(e){drag.g.style.left=e.clientX+'px'; drag.g.style.top=e.clientY+'px';}
+function onMove(e){
+  place(e);
+  const z=zoneAt(e.clientX,e.clientY);
+  $('#flaskWrap').classList.toggle('hot',z==='flask'); $('#shelf').classList.toggle('hot',z==='shelf'&&drag.info.from.tagName==='g');
+}
+async function onUp(e){
+  window.removeEventListener('pointermove',onMove); window.removeEventListener('pointerup',onUp); window.removeEventListener('pointercancel',onUp);
+  $('#flaskWrap').classList.remove('hot'); $('#shelf').classList.remove('hot');
+  const d=drag, z=zoneAt(e.clientX,e.clientY);
+  const ok=await d.info.onDrop(z);
+  d.info.onEnd&&d.info.onEnd();
+  if(ok){d.g.remove();}
+  else{
+    d.g.style.left=d.home.x+'px'; d.g.style.top=d.home.y+'px'; d.g.style.opacity=0;
+    setTimeout(()=>d.g.remove(),260);
+  }
+  drag=null;
+}
+
+$('#undo').onclick=undo;
+$('#reset').onclick=()=>startPuzzle(pi);
+startPuzzle(0);
+</script>
+</body>
+</html>
