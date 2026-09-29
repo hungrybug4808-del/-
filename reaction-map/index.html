@@ -40,6 +40,10 @@ main{flex:1;display:flex;min-height:0;position:relative}
 .card b{display:block;font-size:16px}.card span{font-size:11px;opacity:.9}
 .card.dragging{opacity:.4}
 .c-water{background:#5aa9e6}.c-oxidant{background:#e07a5f}.c-dehy{background:#b58a3c}.c-ester{background:#8e6bbf}
+.fm.shake{transform-box:fill-box;transform-origin:center;animation:shake .65s ease-in-out}
+@keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg)}35%{transform:rotate(6deg)}55%{transform:rotate(-5deg)}75%{transform:rotate(3deg)}}
+#eq.pop{animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
 .ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);transition:left .25s,top .25s,opacity .25s}
 .ghost.chip{background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);margin:0}
 .ghost.card{box-shadow:0 8px 18px rgba(0,0,0,.25)}
@@ -208,24 +212,87 @@ function failMessage(cardId,kinds){
   return (c.msgs&&c.msgs[kinds[0]])||c.msg;
 }
 
-async function useCard(cardId){
+function useCard(cardId){
   const items=state.flask, kinds=items.map(i=>i.kind);
   const r=findReaction(cardId,kinds);
-  if(!r){ say(failMessage(cardId,kinds)); return false; }
-  busy=true;
-  // スロット順（r.in の順）に並べ替え
+  if(!r){ refuse(failMessage(cardId,kinds)); return false; }
   const pool=[...items], slots=r.in.map(k=>pool.splice(pool.findIndex(i=>i.kind===k),1)[0]);
+  runReaction(r,slots);
+  return true;
+}
+// 反応しない：首を振るように揺れて、分子は棚へ戻る（カードは呼び出し側が手札へ戻す）
+async function refuse(text){
+  say(text);
+  if(!state.flask.length) return;
+  busy=true;
+  document.querySelectorAll('#flaskSvg .fm').forEach(g=>g.classList.add('shake'));
+  await wait(650);
+  state.flask.forEach(i=>{ if(!i.bottle) state.shelf.push(i); });
+  state.flask=[]; busy=false; renderAll();
+}
+async function runReaction(r,slots){
+  busy=true;
   await animateReaction(r,slots);
   state.flask=[];
   state.shelf.push({...newInst(r.out),produced:true});
   state.moves++; if(!state.used.includes(r.id)) state.used.push(r.id);
   snap();
-  $('#eq').innerHTML=`<small>${r.name}</small>${r.eq}`;
+  showEq(r);
   busy=false; renderAll();
   if(isCleared()) onClear();
-  return true;
 }
-async function animateReaction(){ /* ステップ2で実装 */ }
+function showEq(r){
+  $('#eq').innerHTML=`<small>${r.name}</small>${r.eq}`;
+  const e=$('#eq'); e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop');
+}
+
+/* ---------- 反応アニメーション ---------- */
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const frames=(dur,fn)=>new Promise(res=>{const t0=performance.now();(function f(now){const t=Math.min(1,(now-t0)/dur);fn(t);t<1?requestAnimationFrame(f):res();})(t0);});
+const LEAVE={x:340,y:-250}, ENTER={x:-340,y:-250};
+
+async function animateReaction(r,slots){
+  const n=slots.length, S=FLASK_S, CY=170, svg=$('#flaskSvg');
+  const src={atoms:[],bonds:[]};
+  slots.forEach((inst,i)=>{const sc=molScene(inst.kind,slotX(n,i),CY,S,i+'.'); src.atoms.push(...sc.atoms); src.bonds.push(...sc.bonds);});
+  const prod=molScene(r.out,300,CY,S,'p.');
+  const uidOf=pid=>r.map[pid.slice(2)]||('new.'+pid.slice(2));
+  const A={};
+  src.atoms.forEach(a=>A[a.id]={id:a.id,el:a.el,from:{x:a.x,y:a.y},to:null});
+  prod.atoms.forEach(a=>{const u=uidOf(a.id); if(A[u]) A[u].to={x:a.x,y:a.y}; else A[u]={id:u,el:a.el,from:null,to:{x:a.x,y:a.y}};});
+  const pb=prod.bonds.map(b=>({a:uidOf(b.a),b:uidOf(b.b),order:b.order}));
+  const key=b=>[b.a,b.b].sort().join('|')+':'+b.order;
+  const sk=new Set(src.bonds.map(key)), pk=new Set(pb.map(key));
+  const sig=(bonds,u)=>bonds.filter(b=>b.a===u||b.b===u).map(b=>(b.a===u?b.b:b.a)+':'+b.order).sort().join(',');
+  const list=Object.values(A);
+  list.forEach(a=>a.changed=!a.from||!a.to||sig(src.bonds,a.id)!==sig(pb,a.id));
+  const leaving=list.filter(a=>!a.to), entering=list.filter(a=>!a.from);
+  const cen=(arr,k)=>({x:arr.reduce((s,a)=>s+a[k].x,0)/arr.length,y:arr.reduce((s,a)=>s+a[k].y,0)/arr.length});
+  const label=(txt,x,y,op)=>`<g opacity="${op}"><rect x="${x-30}" y="${y-15}" width="60" height="30" rx="15" fill="#fff" stroke="#f0b400" stroke-width="2"/><text x="${x}" y="${y+6}" text-anchor="middle" font-size="16" font-weight="700" fill="#8a6a00" font-family="sans-serif">${txt}</text></g>`;
+
+  function draw(e,glow,grp){
+    const atoms=list.map(a=>{
+      let x,y,op=1;
+      if(a.from&&a.to){x=a.from.x+(a.to.x-a.from.x)*e; y=a.from.y+(a.to.y-a.from.y)*e;}
+      else if(a.from){x=a.from.x+LEAVE.x*e; y=a.from.y+LEAVE.y*e; op=1-Math.max(0,(e-.6)/.4);}
+      else{x=a.to.x+ENTER.x*(1-e); y=a.to.y+ENTER.y*(1-e); op=Math.min(1,e*3);}
+      return {id:a.id,el:a.el,x,y,op,glow:glow&&a.changed};
+    });
+    const bonds=src.bonds.map(b=>({a:b.a,b:b.b,order:b.order,op:pk.has(key(b))?1:Math.max(0,1-e*2)}));
+    pb.forEach(b=>{if(!sk.has(key(b))) bonds.push({...b,op:Math.max(0,(e-.5)*2)});});
+    let g=sceneSVG(atoms,bonds,S);
+    if(r.leave&&leaving.length){const c=cen(leaving,'from'); g+=label(r.leave,c.x+LEAVE.x*e,c.y+LEAVE.y*e,e>0&&e<1?1:0);}
+    if(r.enter&&entering.length){const c=cen(entering,'to'); g+=label(r.enter,c.x+ENTER.x*(1-e),c.y+ENTER.y*(1-e),e<1?1:0);}
+    svg.innerHTML=`<g transform="${grp||''}">${g}</g>`;
+  }
+  draw(0,true);            await wait(650);                    // 変わる部分が光る
+  await frames(1300,t=>draw(ease(t),true));                    // 原子が動く
+  await frames(400,t=>draw(1,t<.5));                           // 光が消える
+  await wait(250);
+  await frames(450,t=>{svg.style.opacity=1-t; draw(1,false,`translate(${-220*t} ${40*t})`);});   // 棚へ
+  svg.innerHTML=''; svg.style.opacity=1;
+}
 function isCleared(){
   return state.shelf.some(i=>i.produced&&i.kind===P.goal)&&P.require.every(id=>state.used.includes(id));
 }
@@ -302,10 +369,7 @@ function renderHand(){
     d.addEventListener('pointerdown',e=>beginDrag(e,{
       html:`<b>${c.name}</b><span>${c.sub}</span>`,cls:'card '+c.cls,from:d,
       onStart:()=>d.classList.add('dragging'),onEnd:()=>d.classList.remove('dragging'),
-      onDrop:async zone=>{
-        if(zone!=='flask') return false;
-        return await useCard(id) ? true : false;
-      }}));
+      onDrop:zone=>zone==='flask'&&useCard(id)}));
     box.appendChild(d);
   });
 }
