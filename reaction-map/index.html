@@ -100,15 +100,15 @@ main{flex:1;display:flex;min-height:0;position:relative}
 <div id="toast"></div>
 <div id="app">
   <header id="top">
-    <div class="goal"><span class="lbl">ゴール</span><div id="goalSvg"></div><div><b id="goalName"></b><small id="goalFormula"></small></div></div>
+    <div class="goal"><span class="lbl">ゴール</span><div id="goalSvg"></div><div><b id="goalName"></b><small id="goalFormula"></small><small id="goalNote" style="color:#d9822b"></small></div></div>
     <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><button id="mapBtn">反応マップ</button><button id="toSel">選択へ</button><button id="snd" title="音の入切">♪</button></div>
   </header>
   <main>
-    <aside id="shelf"><h3>棚（手持ちの分子）</h3><div id="shelfItems"></div></aside>
+    <aside id="shelf"><h3>棚（クリックでフラスコへ）</h3><div id="shelfItems"></div></aside>
     <section id="flaskWrap"><div id="msg"></div><div id="flask"><svg id="flaskSvg" viewBox="0 0 600 340"></svg></div><div id="eq"></div></section>
     <aside id="mapPanel"><div class="in"><h3>反応マップ（分子をクリックすると説明）</h3><svg id="mapSvg" viewBox="0 0 470 400" width="460"></svg><div id="mapInfo"></div></div></aside>
   </main>
-  <footer id="hand"><h3>手札（フラスコへドラッグ）</h3><div id="handCards"></div></footer>
+  <footer id="hand"><h3>手札（ドラッグ、またはクリックで使う）</h3><div id="handCards"></div></footer>
 </div>
 <div id="overlay"><div class="box" id="overlayBox"></div></div>
 
@@ -173,7 +173,7 @@ const REACTIONS = [
 const PUZZLES = [
   {start:'ethanol',  goal:'acetaldehyde',min:1,require:[],aim:'酸化の基本'},
   {start:'ethylene', goal:'aceticacid',  min:3,require:[],aim:'付加 → 酸化 → 酸化'},
-  {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],aim:'脱水と付加は逆の関係（エチレンを経由）'},
+  {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],note:'エチレンを経由して、エタノールに作り直そう（脱水→付加）',aim:'脱水と付加は逆の関係（エチレンを経由）'},
   {start:'ethylene', goal:'ethylacetate',min:5,require:[],finale:true,aim:'2つに分けて、片方を酢酸にしてから合わせる'},
 ];
 const HAND = ['water','oxidant','dehy','ester'];
@@ -313,8 +313,7 @@ async function refuse(text){
   busy=true;
   document.querySelectorAll('#flaskSvg .fm').forEach(g=>g.classList.add('shake'));
   await wait(650);
-  state.flask.forEach(i=>{ if(!i.bottle) state.shelf.push(i); });
-  state.flask=[]; busy=false; renderAll();
+  busy=false; renderFlask();
 }
 async function runReaction(r,slots){
   busy=true;
@@ -468,7 +467,7 @@ function say(t){const m=$('#msg'); m.textContent=t; m.style.opacity=1; clearTime
 
 function renderAll(){
   const g=MOLS[P.goal];
-  $('#goalSvg').innerHTML=molSVG(P.goal,16); $('#goalName').textContent=g.name; $('#goalFormula').textContent=g.formula;
+  $('#goalSvg').innerHTML=molSVG(P.goal,16); $('#goalName').textContent=g.name; $('#goalFormula').textContent=g.formula; $('#goalNote').textContent=P.note||'';
   $('#moves').textContent=state.moves;
   renderShelf(); renderFlask(); renderHand();
 }
@@ -476,7 +475,7 @@ function chip(kind,bottle,inst){
   const m=MOLS[kind], d=el('div','chip'+(bottle?' bottle':''),
     `${molSVG(kind,12)}<div><div class="nm">${m.name}${bottle?'<span class="inf">∞</span>':''}</div><div class="fm">${m.formula}</div></div>`);
   d.addEventListener('pointerdown',e=>beginDrag(e,{
-    html:molSVG(kind,14),cls:'chip',from:d,
+    html:molSVG(kind,14),cls:'chip',from:d,clickZone:'flask',
     onStart:()=>d.classList.add('dragging'),
     onEnd:()=>d.classList.remove('dragging'),
     onDrop:zone=>{
@@ -506,7 +505,7 @@ function renderFlask(){
 $('#flaskSvg').addEventListener('pointerdown',e=>{
   const g=e.target.closest('[data-uid]'); if(!g) return;
   const inst=state.flask.find(i=>i.uid==g.dataset.uid); if(!inst) return;
-  beginDrag(e,{html:molSVG(inst.kind,14),cls:'chip',from:g,
+  beginDrag(e,{html:molSVG(inst.kind,14),cls:'chip',from:g,clickZone:'shelf',
     onStart:()=>g.style.opacity=.3, onEnd:()=>g.style.opacity=1,
     onDrop:zone=>{
       if(zone!=='shelf') return false;
@@ -520,7 +519,7 @@ function renderHand(){
   HAND.forEach(id=>{
     const c=CARDS[id], d=el('div','card '+c.cls,`<b>${c.name}</b><span>${c.sub}</span>`);
     d.addEventListener('pointerdown',e=>beginDrag(e,{
-      html:`<b>${c.name}</b><span>${c.sub}</span>`,cls:'card '+c.cls,from:d,
+      html:`<b>${c.name}</b><span>${c.sub}</span>`,cls:'card '+c.cls,from:d,clickZone:'flask',
       onStart:()=>d.classList.add('dragging'),onEnd:()=>d.classList.remove('dragging'),
       onDrop:zone=>zone==='flask'&&useCard(id)}));
     box.appendChild(d);
@@ -531,7 +530,7 @@ function renderHand(){
 let drag=null;
 function zoneAt(x,y){
   const inside=(id)=>{const r=$(id).getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;};
-  if(inside('#flask')) return 'flask';
+  if(inside('#flaskWrap')) return 'flask';
   if(inside('#shelf')) return 'shelf';
   return null;
 }
@@ -540,7 +539,7 @@ function beginDrag(e,info){
   e.preventDefault();
   const g=el('div','ghost '+(info.cls||''),info.html); document.body.appendChild(g);
   const r=info.from.getBoundingClientRect();
-  drag={g,info,home:{x:r.left+r.width/2,y:r.top+r.height/2}};
+  drag={sx:e.clientX,sy:e.clientY,g,info,home:{x:r.left+r.width/2,y:r.top+r.height/2}};
   place(e); info.onStart&&info.onStart();
   window.addEventListener('pointermove',onMove); window.addEventListener('pointerup',onUp); window.addEventListener('pointercancel',onUp);
 }
@@ -553,7 +552,8 @@ function onMove(e){
 async function onUp(e){
   window.removeEventListener('pointermove',onMove); window.removeEventListener('pointerup',onUp); window.removeEventListener('pointercancel',onUp);
   $('#flaskWrap').classList.remove('hot'); $('#shelf').classList.remove('hot');
-  const d=drag, z=zoneAt(e.clientX,e.clientY);
+  const d=drag, moved=Math.hypot(e.clientX-d.sx,e.clientY-d.sy)>6;
+  const z=moved?zoneAt(e.clientX,e.clientY):d.info.clickZone;
   const ok=await d.info.onDrop(z);
   d.info.onEnd&&d.info.onEnd();
   if(ok){d.g.remove();}
