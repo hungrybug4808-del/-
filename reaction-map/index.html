@@ -44,6 +44,40 @@ main{flex:1;display:flex;min-height:0;position:relative}
 @keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg)}35%{transform:rotate(6deg)}55%{transform:rotate(-5deg)}75%{transform:rotate(3deg)}}
 #eq.pop{animation:pop .5s ease-out}
 @keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);z-index:60;overflow:auto;padding:24px}
+.screen.on{display:flex}
+#scr-title h1{font-size:44px;margin:0 0 6px;letter-spacing:.08em}
+#scr-title p{color:var(--sub);margin:0 0 28px}
+.big{font-size:18px;padding:12px 40px;background:var(--accent);color:#fff;border:none;border-radius:14px}
+.big:hover{background:#4a7ce0}
+.linkbtn{border:none;background:none;color:var(--sub);font-size:12px;margin-top:22px;text-decoration:underline}
+#scr-select h2{margin:0 0 16px}
+#puzzleList{display:grid;grid-template-columns:repeat(2,minmax(230px,280px));gap:14px;margin-bottom:18px}
+.pz{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;text-align:left;cursor:pointer}
+.pz:hover{border-color:var(--accent)}
+.pz.locked{opacity:.45;cursor:default}.pz.locked:hover{border-color:var(--line)}
+.pz .no{font-size:12px;color:var(--sub)}.pz .st{color:#e6a700;font-size:18px;letter-spacing:2px}
+.pz .aim{font-size:12px;color:var(--sub);margin-top:4px}
+#mapPanel{width:0;overflow:hidden;background:#faf7f0;border-left:0 solid var(--line);transition:width .3s}
+#mapPanel.open{width:480px;border-left-width:1px}
+#mapPanel .in{width:480px;padding:10px}
+#mapPanel h3{margin:0 0 4px;font-size:13px;color:var(--sub)}
+#mapInfo{min-height:52px;font-size:13px;padding:6px 8px}
+.mnode{cursor:pointer}.mnode:hover rect{fill:#eef4ff}
+.mnode.new{animation:nodepop .6s ease-out;transform-box:fill-box;transform-origin:center}
+@keyframes nodepop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.medge.new{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .9s .2s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.mlab.new{animation:fadein .6s .8s both}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+#mapBtn.badge::after{content:"●";color:#e0585b;margin-left:4px;font-size:10px;vertical-align:super}
+#mapBtn.badge{animation:pulse 1.2s 3}
+@keyframes pulse{50%{background:#ffe9a8}}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff8dc;border:1px solid #f0b400;color:#8a6a00;padding:6px 18px;border-radius:20px;font-weight:700;z-index:90;opacity:0;pointer-events:none;transition:opacity .4s}
+.rxl{list-style:none;padding:0;margin:8px 0 0;font-size:14px;text-align:left}
+.rxl li{padding:3px 0}.rxl small{color:var(--sub);margin-right:6px}
+.confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:120;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
 .ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);transition:left .25s,top .25s,opacity .25s}
 .ghost.chip{background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);margin:0}
 .ghost.card{box-shadow:0 8px 18px rgba(0,0,0,.25)}
@@ -54,14 +88,25 @@ main{flex:1;display:flex;min-height:0;position:relative}
 </style>
 </head>
 <body>
+<div class="screen on" id="scr-title">
+  <h1>反応の地図</h1><p>有機化学パズル　ステージ1：炭素2個の世界</p>
+  <button class="big" id="startBtn">はじめる</button>
+  <button class="linkbtn" id="wipeBtn">保存データを消す</button>
+</div>
+<div class="screen" id="scr-select">
+  <h2>パズルをえらぶ</h2><div id="puzzleList"></div>
+  <button id="selBack">タイトルへ</button>
+</div>
+<div id="toast"></div>
 <div id="app">
   <header id="top">
     <div class="goal"><span class="lbl">ゴール</span><div id="goalSvg"></div><div><b id="goalName"></b><small id="goalFormula"></small></div></div>
-    <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><span id="pickRow"></span></div>
+    <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><button id="mapBtn">反応マップ</button><button id="toSel">選択へ</button><button id="snd" title="音の入切">♪</button></div>
   </header>
   <main>
     <aside id="shelf"><h3>棚（手持ちの分子）</h3><div id="shelfItems"></div></aside>
     <section id="flaskWrap"><div id="msg"></div><div id="flask"><svg id="flaskSvg" viewBox="0 0 600 340"></svg></div><div id="eq"></div></section>
+    <aside id="mapPanel"><div class="in"><h3>反応マップ（分子をクリックすると説明）</h3><svg id="mapSvg" viewBox="0 0 470 400" width="460"></svg><div id="mapInfo"></div></div></aside>
   </main>
   <footer id="hand"><h3>手札（フラスコへドラッグ）</h3><div id="handCards"></div></footer>
 </div>
@@ -129,7 +174,7 @@ const PUZZLES = [
   {start:'ethanol',  goal:'acetaldehyde',min:1,require:[],aim:'酸化の基本'},
   {start:'ethylene', goal:'aceticacid',  min:3,require:[],aim:'付加 → 酸化 → 酸化'},
   {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],aim:'脱水と付加は逆の関係（エチレンを経由）'},
-  {start:'ethylene', goal:'ethylacetate',min:5,require:[],aim:'2つに分けて、片方を酢酸にしてから合わせる'},
+  {start:'ethylene', goal:'ethylacetate',min:5,require:[],finale:true,aim:'2つに分けて、片方を酢酸にしてから合わせる'},
 ];
 const HAND = ['water','oxidant','dehy','ester'];
 
@@ -181,6 +226,47 @@ function molSVG(kind,S){
    ========================================================= */
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+/* ---------- 保存 ---------- */
+const KEY='reactionMap.stage1.v1';
+let save={clear:[0,0,0,0],found:[],sound:true};
+try{const d=JSON.parse(localStorage.getItem(KEY)||'null'); if(d) save={...save,...d};}catch(e){}
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch(e){}};
+
+/* ---------- 音（やわらかい成功音だけ） ---------- */
+let actx=null;
+function tone(freqs,step=.11,dur=.5,vol=.13){
+  if(!save.sound) return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended') actx.resume();
+    freqs.forEach((f,i)=>{
+      const o=actx.createOscillator(),g=actx.createGain(),t=actx.currentTime+i*step;
+      o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(vol,t+.02); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+.05);
+    });
+  }catch(e){}
+}
+const sfxReact=()=>tone([523.25,659.25,783.99],.09,.45);
+const sfxClear=big=>tone(big?[523.25,659.25,783.99,1046.5,1318.5,1567.98]:[523.25,659.25,783.99,1046.5],big?.13:.12,big?.9:.7);
+
+/* ---------- 画面の切り替え ---------- */
+function showScreen(name){
+  ['title','select'].forEach(n=>$('#scr-'+n).classList.toggle('on',n===name));
+  $('#overlay').style.display='none';
+}
+const unlocked=i=>i===0||save.clear[i-1]>0;
+function renderSelect(){
+  $('#puzzleList').innerHTML=PUZZLES.map((q,i)=>{
+    const st=save.clear[i],lock=!unlocked(i);
+    return `<div class="pz${lock?' locked':''}" data-i="${i}"><div class="no">第${i+1}問${lock?'　🔒':''}</div>
+      <b>${MOLS[q.start].name} → ${MOLS[q.goal].name}</b>
+      <div class="st">${st?'★'.repeat(st)+'☆'.repeat(3-st):'☆☆☆'}</div><div class="aim">${lock?'前の問をクリアすると開きます':q.aim}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.pz').forEach(d=>d.onclick=()=>{const i=+d.dataset.i; if(unlocked(i)){showScreen(null); startPuzzle(i);}});
+}
+function toSelect(){renderSelect(); showScreen('select');}
+
 let pi=0, P=null, state=null, busy=false, uidn=1;
 const FLASK_S=40;
 
@@ -188,9 +274,9 @@ const newInst=(kind,bottle)=>({uid:uidn++,kind,bottle:!!bottle});
 
 function startPuzzle(i){
   pi=i; P=PUZZLES[i]; busy=false;
-  state={shelf:[],flask:[],moves:0,used:[],hist:[]};
+  state={shelf:[],flask:[],moves:0,used:[],hist:[],newFound:[]};
   snap(); $('#eq').innerHTML=''; $('#overlay').style.display='none';
-  renderAll();
+  renderAll(); renderMap();
 }
 function snap(){state.hist.push(JSON.stringify({shelf:state.shelf,moves:state.moves,used:state.used}));}
 function undo(){
@@ -237,7 +323,9 @@ async function runReaction(r,slots){
   state.shelf.push({...newInst(r.out),produced:true});
   state.moves++; if(!state.used.includes(r.id)) state.used.push(r.id);
   snap();
-  showEq(r);
+  showEq(r); sfxReact();
+  const isNew=!save.found.includes(r.id);
+  if(isNew){save.found.push(r.id); state.newFound.push(r.id); persist(); mapNew=[r.id]; toast('新しい反応を発見！　'+r.name); $('#mapBtn').classList.add('badge'); renderMap();}
   busy=false; renderAll();
   if(isCleared()) onClear();
 }
@@ -299,12 +387,79 @@ function isCleared(){
 function starsFor(moves){return moves<=P.min?3:moves<=P.min+2?2:1;}
 function onClear(){
   const st=starsFor(state.moves);
-  $('#overlayBox').innerHTML=`<h2>クリア！</h2><div style="font-size:28px;color:#e6a700">${'★'.repeat(st)}${'☆'.repeat(3-st)}</div>
-    <p>手数 ${state.moves}（最少 ${P.min}）</p>
-    <div class="btns">${pi<PUZZLES.length-1?'<button id="nextBtn">次の問へ</button>':''}<button id="retryBtn">もう一度</button></div>`;
+  save.clear[pi]=Math.max(save.clear[pi]||0,st); persist();
+  const list=state.newFound.length
+    ? state.newFound.map(id=>{const r=REACTIONS.find(x=>x.id===id);return `<li><small>${r.name}</small>${r.eq}</li>`;}).join('')
+    : `<li><small>新しい反応はありませんでした</small></li>`;
+  const fin=P.finale;
+  $('#overlayBox').innerHTML=`<h2>${fin?'ステージ1 クリア！':'クリア！'}</h2>
+    <div style="font-size:${fin?40:30}px;color:#e6a700">${'★'.repeat(st)}${'☆'.repeat(3-st)}</div>
+    <p>手数 ${state.moves}　（最少 ${P.min}）</p>
+    <div style="font-size:12px;color:var(--sub)">今回見つけた反応</div><ul class="rxl">${list}</ul>
+    ${fin?'<p style="margin:10px 0 0">炭素2個の世界の地図が、ぜんぶつながりました！</p>':''}
+    <div class="btns">${pi<PUZZLES.length-1?'<button id="nextBtn" class="big" style="padding:8px 22px;font-size:15px">次の問へ</button>':''}<button id="selBtn">選択画面へ</button></div>`;
   $('#overlay').style.display='flex';
   const n=$('#nextBtn'); if(n) n.onclick=()=>startPuzzle(pi+1);
-  $('#retryBtn').onclick=()=>startPuzzle(pi);
+  $('#selBtn').onclick=toSelect;
+  sfxClear(fin); if(fin) confetti();
+}
+function confetti(){
+  const cols=['#e0585b','#5aa9e6','#f0b400','#4caf7d','#8e6bbf'];
+  for(let i=0;i<70;i++){
+    const c=el('div','confetti'); c.style.left=Math.random()*100+'vw'; c.style.background=cols[i%5];
+    c.style.animationDuration=(2.2+Math.random()*2)+'s'; c.style.animationDelay=Math.random()*.8+'s';
+    document.body.appendChild(c); setTimeout(()=>c.remove(),5500);
+  }
+}
+let toastT=null;
+function toast(t){const e=$('#toast'); e.textContent=t; e.style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>e.style.opacity=0,2400);}
+
+/* ---------- 反応マップ ---------- */
+let mapNew=[];
+const MAP={ // 分子ノードの位置と、矢印ラベルの位置（ステージを増やすときはここに足す）
+  pos:{ethylene:[100,50],ethanol:[100,150],acetaldehyde:[100,250],aceticacid:[100,350],ethylacetate:[400,250]},
+  label:{addition:[185,84],dehydration:[185,114],oxidation1:[185,194],oxidation2:[185,294],esterification:[400,314]},
+  curve:{esterification:true},
+};
+const RCOL={water:'#5aa9e6',oxidant:'#e07a5f',dehy:'#b58a3c',ester:'#8e6bbf'};
+function renderMap(){
+  const found=REACTIONS.filter(r=>save.found.includes(r.id));
+  const nodes=new Set(); found.forEach(r=>{r.in.forEach(k=>nodes.add(k)); nodes.add(r.out);});
+  const W=130,H=46; let defs='',edges='',labs='',nd='';
+  if(!found.length) nd='<text x="235" y="200" text-anchor="middle" fill="#b9b5a8" font-size="14">反応を起こすと、ここに地図が広がります</text>';
+  Object.keys(RCOL).forEach(k=>defs+=`<marker id="ah-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${RCOL[k]}"/></marker>`);
+  for(const r of found){
+    const col=RCOL[r.card], isNew=mapNew.includes(r.id);
+    const rev=REACTIONS.some(q=>q.in.length===1&&r.in.length===1&&q.in[0]===r.out&&q.out===r.in[0]);
+    for(const inK of r.in){
+      const [x1,y1]=MAP.pos[inK],[x2,y2]=MAP.pos[r.out];
+      let d;
+      if(MAP.curve[r.id]){
+        const sx=x1+W/2, ex=x2, ey=y2+(y1<y2?-H/2:H/2);
+        d=`M${sx},${y1} Q${x2},${y1} ${ex},${ey}`;
+      }else{
+        const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),ux=dx/L,uy=dy/L,off=rev?16:0,nx=-uy*off,ny=ux*off;
+        const t=Math.min(Math.abs(ux)>1e-6?W/2/Math.abs(ux):1e9,Math.abs(uy)>1e-6?H/2/Math.abs(uy):1e9)+3;
+        d=`M${x1+ux*t+nx},${y1+uy*t+ny} L${x2-ux*t+nx},${y2-uy*t+ny}`;
+      }
+      edges+=`<path class="medge${isNew?' new':''}" pathLength="1" d="${d}" fill="none" stroke="${col}" stroke-width="2.5" marker-end="url(#ah-${r.card})"/>`;
+    }
+    const [lx,ly]=MAP.label[r.id], anc=MAP.curve[r.id]?'middle':'start';
+    labs+=`<g class="mlab${isNew?' new':''}"><text x="${lx}" y="${ly}" text-anchor="${anc}" font-size="11" font-weight="700" fill="${col}">${r.name}</text>
+      <text x="${lx}" y="${ly+12}" text-anchor="${anc}" font-size="10" fill="${col}">${r.cond}</text></g>`;
+  }
+  const firstNew=new Set(mapNew.flatMap(id=>{const r=REACTIONS.find(x=>x.id===id);return [...r.in,r.out];}));
+  nodes.forEach(k=>{
+    const [x,y]=MAP.pos[k],m=MOLS[k];
+    nd+=`<g class="mnode${firstNew.has(k)&&mapNew.length?' new':''}" data-k="${k}"><rect x="${x-W/2}" y="${y-H/2}" width="${W}" height="${H}" rx="12" fill="#fff" stroke="#cfc8b6" stroke-width="1.5"/>
+      <text x="${x}" y="${y-3}" text-anchor="middle" font-size="13" font-weight="700" fill="#3b3a36">${m.name}</text>
+      <text x="${x}" y="${y+13}" text-anchor="middle" font-size="11" fill="#8a877d">${m.formula}</text></g>`;
+  });
+  $('#mapSvg').innerHTML=`<defs>${defs}</defs>${edges}${labs}${nd}`;
+  document.querySelectorAll('.mnode').forEach(g=>g.onclick=()=>{
+    const m=MOLS[g.dataset.k]; $('#mapInfo').innerHTML=`<b>${m.name}</b>　${m.formula}<br><span style="color:var(--sub)">官能基：</span>${m.group}`;
+  });
+  mapNew=[];
 }
 
 /* ---------- 表示 ---------- */
@@ -315,8 +470,6 @@ function renderAll(){
   const g=MOLS[P.goal];
   $('#goalSvg').innerHTML=molSVG(P.goal,16); $('#goalName').textContent=g.name; $('#goalFormula').textContent=g.formula;
   $('#moves').textContent=state.moves;
-  $('#pickRow').innerHTML=PUZZLES.map((_,i)=>`<button data-p="${i}" style="padding:4px 10px;${i===pi?'background:#dbe6fb':''}">${i+1}</button>`).join(' ');
-  document.querySelectorAll('#pickRow button').forEach(b=>b.onclick=()=>startPuzzle(+b.dataset.p));
   renderShelf(); renderFlask(); renderHand();
 }
 function chip(kind,bottle,inst){
@@ -413,7 +566,14 @@ async function onUp(e){
 
 $('#undo').onclick=undo;
 $('#reset').onclick=()=>startPuzzle(pi);
-startPuzzle(0);
+$('#toSel').onclick=()=>{if(!busy) toSelect();};
+$('#mapBtn').onclick=()=>{$('#mapPanel').classList.toggle('open'); $('#mapBtn').classList.remove('badge');};
+const syncSnd=()=>{$('#snd').style.opacity=save.sound?1:.4; $('#snd').title=save.sound?'音：ON':'音：OFF';};
+$('#snd').onclick=()=>{save.sound=!save.sound; persist(); syncSnd(); if(save.sound) tone([659.25],.1,.3);};
+$('#startBtn').onclick=()=>{tone([523.25,783.99],.1,.4); toSelect();};
+$('#wipeBtn').onclick=()=>{if(confirm('クリア状況と、見つけた反応をすべて消します。よろしいですか？')){save={clear:[0,0,0,0],found:[],sound:save.sound}; persist();}};
+syncSnd();
+startPuzzle(0); showScreen('title');
 </script>
 </body>
 </html>
