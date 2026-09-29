@@ -78,6 +78,16 @@ main{flex:1;display:flex;min-height:0;position:relative}
 .rxl li{padding:3px 0}.rxl small{color:var(--sub);margin-right:6px}
 .confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:120;pointer-events:none;animation:fall linear forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+#flask{position:relative}
+#flaskSvg{position:relative;z-index:1}
+.bubbles{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
+.bubbles i{position:absolute;bottom:-20px;border-radius:50%;background:rgba(120,170,240,.22);border:1px solid rgba(120,170,240,.4);animation:rise linear infinite}
+@keyframes rise{to{transform:translateY(-360px)}}
+.fm{transform-box:fill-box;transform-origin:center;animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px)}}
+.fm.shake{animation:shake .65s ease-in-out}
+.fx{position:fixed;z-index:80;pointer-events:none;font-weight:800;color:#e6a700;text-shadow:0 1px 0 #fff}
+#hintBtn{background:#fff8dc;border-color:#f0b400}
 .ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);transition:left .25s,top .25s,opacity .25s}
 .ghost.chip{background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);margin:0}
 .ghost.card{box-shadow:0 8px 18px rgba(0,0,0,.25)}
@@ -85,6 +95,31 @@ main{flex:1;display:flex;min-height:0;position:relative}
 #overlay .box{background:var(--panel);border-radius:20px;padding:26px 34px;text-align:center;min-width:300px}
 #overlay h2{margin:0 0 6px}
 #overlay .btns{display:flex;gap:10px;justify-content:center;margin-top:16px}
+@media (max-width:720px){
+  html,body{touch-action:manipulation}
+  #app{height:100dvh}
+  #top{flex-wrap:wrap;padding:6px 10px;gap:6px}
+  .goal{gap:8px}.goal b{font-size:16px}
+  .tools{flex-wrap:wrap;gap:6px}.tools button{padding:5px 10px;font-size:13px}
+  main{flex-direction:column}
+  #shelf{width:100%;border-right:0;border-bottom:1px solid var(--line);padding:6px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;overflow-y:hidden;flex:none}
+  #shelf h3{display:none}
+  #shelfItems{display:flex;gap:8px}
+  .chip{margin:0;flex:none;touch-action:pan-x}
+  #flaskWrap{padding:6px;flex:1}
+  #flask{border-radius:18px 18px 40px 40px}
+  #eq{font-size:14px;min-height:24px;margin-top:4px}
+  #msg{font-size:13px;margin-bottom:4px}
+  #hand{padding:6px 10px 10px}#hand h3{margin-bottom:4px}
+  #handCards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .card{width:auto;padding:8px 10px}.card b{font-size:15px}.card span{font-size:10px}
+  #mapPanel{display:none;position:fixed;left:0;right:0;bottom:0;top:auto;height:72%;width:100%;z-index:70;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.2);overflow:auto}
+  #mapPanel.open{display:block;width:100%;border-left-width:0}
+  #mapPanel .in{width:100%}#mapSvg{width:100%;height:auto}
+  #puzzleList{grid-template-columns:1fr;width:100%}
+  #scr-title h1{font-size:34px}
+  #overlay .box{min-width:0;width:92%;padding:20px 16px}
+}
 </style>
 </head>
 <body>
@@ -94,18 +129,18 @@ main{flex:1;display:flex;min-height:0;position:relative}
   <button class="linkbtn" id="wipeBtn">保存データを消す</button>
 </div>
 <div class="screen" id="scr-select">
-  <h2>パズルをえらぶ</h2><div id="puzzleList"></div>
+  <h2>パズルをえらぶ</h2><div id="totalStars" style="color:#e6a700;margin-bottom:12px"></div><div id="puzzleList"></div>
   <button id="selBack">タイトルへ</button>
 </div>
 <div id="toast"></div>
 <div id="app">
   <header id="top">
     <div class="goal"><span class="lbl">ゴール</span><div id="goalSvg"></div><div><b id="goalName"></b><small id="goalFormula"></small><small id="goalNote" style="color:#d9822b"></small></div></div>
-    <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><button id="mapBtn">反応マップ</button><button id="toSel">選択へ</button><button id="snd" title="音の入切">♪</button></div>
+    <div class="tools"><span class="mv">手数 <b id="moves">0</b></span><button id="undo">戻す</button><button id="reset">最初から</button><button id="hintBtn">ヒント</button><button id="mapBtn">反応マップ</button><button id="toSel">選択へ</button><button id="snd" title="音の入切">♪</button></div>
   </header>
   <main>
     <aside id="shelf"><h3>棚（クリックでフラスコへ）</h3><div id="shelfItems"></div></aside>
-    <section id="flaskWrap"><div id="msg"></div><div id="flask"><svg id="flaskSvg" viewBox="0 0 600 340"></svg></div><div id="eq"></div></section>
+    <section id="flaskWrap"><div id="msg"></div><div id="flask"><div class="bubbles" id="bubbles"></div><svg id="flaskSvg" viewBox="0 0 600 340"></svg></div><div id="eq"></div></section>
     <aside id="mapPanel"><div class="in"><h3>反応マップ（分子をクリックすると説明）</h3><svg id="mapSvg" viewBox="0 0 470 400" width="460"></svg><div id="mapInfo"></div></div></aside>
   </main>
   <footer id="hand"><h3>手札（ドラッグ、またはクリックで使う）</h3><div id="handCards"></div></footer>
@@ -171,10 +206,10 @@ const REACTIONS = [
 
 // start: 瓶（∞）に入っている分子  require: クリアに必要な反応（省略可）
 const PUZZLES = [
-  {start:'ethanol',  goal:'acetaldehyde',min:1,require:[],aim:'酸化の基本'},
-  {start:'ethylene', goal:'aceticacid',  min:3,require:[],aim:'付加 → 酸化 → 酸化'},
-  {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],note:'エチレンを経由して、エタノールに作り直そう（脱水→付加）',aim:'脱水と付加は逆の関係（エチレンを経由）'},
-  {start:'ethylene', goal:'ethylacetate',min:5,require:[],finale:true,aim:'2つに分けて、片方を酢酸にしてから合わせる'},
+  {start:'ethanol',  goal:'acetaldehyde',min:1,require:[],hints:['エタノールのヒドロキシ基が変わると…？','酸化剤カードを、エタノールに1回使おう'],aim:'酸化の基本'},
+  {start:'ethylene', goal:'aceticacid',  min:3,require:[],hints:['まず、エチレンからエタノールを作ろう','水 → 酸化剤 → 酸化剤 の順に使おう'],aim:'付加 → 酸化 → 酸化'},
+  {start:'ethanol',  goal:'ethanol',     min:2,require:['dehydration','addition'],hints:['まず、エタノールをエチレンにしよう（濃硫酸・約170℃）','エチレンに水を付加すると、エタノールに戻るよ'],note:'エチレンを経由して、エタノールに作り直そう（脱水→付加）',aim:'脱水と付加は逆の関係（エチレンを経由）'},
+  {start:'ethylene', goal:'ethylacetate',min:5,require:[],finale:true,hints:['ゴールにはエタノールと酢酸が両方必要。エチレンからエタノールを2つ作ろう','片方のエタノールを、酸化剤で2回酸化して酢酸に','エタノール＋酢酸を入れて、濃硫酸（触媒）を使おう'],aim:'2つに分けて、片方を酢酸にしてから合わせる'},
 ];
 const HAND = ['water','oxidant','dehy','ester'];
 
@@ -257,6 +292,7 @@ function showScreen(name){
 }
 const unlocked=i=>i===0||save.clear[i-1]>0;
 function renderSelect(){
+  $('#totalStars').textContent='★ '+save.clear.reduce((a,b)=>a+b,0)+' / '+PUZZLES.length*3;
   $('#puzzleList').innerHTML=PUZZLES.map((q,i)=>{
     const st=save.clear[i],lock=!unlocked(i);
     return `<div class="pz${lock?' locked':''}" data-i="${i}"><div class="no">第${i+1}問${lock?'　🔒':''}</div>
@@ -274,7 +310,7 @@ const newInst=(kind,bottle)=>({uid:uidn++,kind,bottle:!!bottle});
 
 function startPuzzle(i){
   pi=i; P=PUZZLES[i]; busy=false;
-  state={shelf:[],flask:[],moves:0,used:[],hist:[],newFound:[]};
+  state={shelf:[],flask:[],moves:0,used:[],hist:[],newFound:[],hint:0};
   snap(); $('#eq').innerHTML=''; $('#overlay').style.display='none';
   renderAll(); renderMap();
 }
@@ -322,11 +358,26 @@ async function runReaction(r,slots){
   state.shelf.push({...newInst(r.out),produced:true});
   state.moves++; if(!state.used.includes(r.id)) state.used.push(r.id);
   snap();
-  showEq(r); sfxReact();
+  showEq(r); sfxReact(); burst(r);
   const isNew=!save.found.includes(r.id);
   if(isNew){save.found.push(r.id); state.newFound.push(r.id); persist(); mapNew=[r.id]; toast('新しい反応を発見！　'+r.name); $('#mapBtn').classList.add('badge'); renderMap();}
   busy=false; renderAll();
   if(isCleared()) onClear();
+}
+const PRAISE=['ナイス！','いい反応！','すごい！','その調子！','きれいに変わった！'];
+function burst(r){
+  const b=$('#flask').getBoundingClientRect(), cx=b.left+b.width/2, cy=b.top+b.height/2;
+  const cols=['#f0b400','#5aa9e6','#e0585b','#4caf7d','#8e6bbf'];
+  for(let i=0;i<18;i++){
+    const d=el('div','fx','✦'); d.style.left=cx+'px'; d.style.top=cy+'px'; d.style.color=cols[i%5]; d.style.fontSize=(12+Math.random()*14)+'px';
+    document.body.appendChild(d);
+    const a=Math.random()*Math.PI*2, dist=90+Math.random()*130;
+    d.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(${Math.cos(a)*dist}px,${Math.sin(a)*dist}px) rotate(200deg) scale(.2)`,opacity:0}],{duration:900,easing:'ease-out'}).onfinish=()=>d.remove();
+  }
+  const t=el('div','fx',PRAISE[Math.floor(Math.random()*PRAISE.length)]); t.style.left=cx+'px'; t.style.top=cy-40+'px'; t.style.fontSize='26px';
+  document.body.appendChild(t);
+  t.animate([{transform:'translate(-50%,0)',opacity:0},{transform:'translate(-50%,-20px)',opacity:1,offset:.3},{transform:'translate(-50%,-60px)',opacity:0}],{duration:1200,easing:'ease-out'}).onfinish=()=>t.remove();
+  try{navigator.vibrate&&navigator.vibrate(30);}catch(e){}
 }
 function showEq(r){
   $('#eq').innerHTML=`<small>${r.name}</small>${r.eq}`;
@@ -463,7 +514,7 @@ function renderMap(){
 
 /* ---------- 表示 ---------- */
 let msgTimer=null;
-function say(t){const m=$('#msg'); m.textContent=t; m.style.opacity=1; clearTimeout(msgTimer); msgTimer=setTimeout(()=>m.style.opacity=0,4000);}
+function say(t,ms=4000){const m=$('#msg'); m.textContent=t; m.style.color=''; m.style.opacity=1; clearTimeout(msgTimer); msgTimer=setTimeout(()=>m.style.opacity=0,ms);}
 
 function renderAll(){
   const g=MOLS[P.goal];
@@ -543,7 +594,7 @@ function beginDrag(e,info){
   place(e); info.onStart&&info.onStart();
   window.addEventListener('pointermove',onMove); window.addEventListener('pointerup',onUp); window.addEventListener('pointercancel',onUp);
 }
-function place(e){drag.g.style.left=e.clientX+'px'; drag.g.style.top=e.clientY+'px';}
+function place(e){drag.g.style.left=e.clientX+'px'; drag.g.style.top=(e.clientY-(e.pointerType==='touch'?56:0))+'px';}
 function onMove(e){
   place(e);
   const z=zoneAt(e.clientX,e.clientY);
@@ -564,6 +615,10 @@ async function onUp(e){
   drag=null;
 }
 
+$('#hintBtn').onclick=()=>{
+  const h=P.hints; say('💡 '+h[Math.min(state.hint,h.length-1)],7000); $('#msg').style.color='#3b7ad9'; state.hint++;
+};
+$('#bubbles').innerHTML=Array.from({length:9},(_,i)=>`<i style="left:${8+i*10.5}%;width:${8+(i*7)%12}px;height:${8+(i*7)%12}px;animation-duration:${5+(i*3)%6}s;animation-delay:${-(i*1.7)%6}s"></i>`).join('');
 $('#undo').onclick=undo;
 $('#reset').onclick=()=>startPuzzle(pi);
 $('#toSel').onclick=()=>{if(!busy) toSelect();};
